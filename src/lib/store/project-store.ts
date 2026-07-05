@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage } from "@/lib/ai/types";
+import type { ChatMessage, GeneratedFile } from "@/lib/ai/types";
 import type { TechStackProposal } from "@/lib/domain/stack";
 
 export interface Highlight {
@@ -13,6 +13,8 @@ interface ProjectState {
   stackProposal: TechStackProposal | null;
   highlighted: Highlight | null;
   pinned: boolean;
+  generatedFiles: GeneratedFile[];
+  previewUrl: string | null;
 
   setPlanText: (text: string) => void;
   addChatMessage: (msg: ChatMessage) => void;
@@ -22,6 +24,9 @@ interface ProjectState {
   clearHoverHighlight: (highlight: Highlight) => void;
   toggleClickHighlight: (highlight: Highlight) => void;
   resetStack: () => void;
+  setGeneratedFiles: (files: GeneratedFile[]) => void;
+  updateGeneratedFile: (path: string, content: string) => void;
+  setPreviewUrl: (url: string | null) => void;
 }
 
 function sameHighlight(a: Highlight | null, b: Highlight | null): boolean {
@@ -34,6 +39,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   stackProposal: null,
   highlighted: null,
   pinned: false,
+  generatedFiles: [],
+  previewUrl: null,
 
   setPlanText: (text) => set({ planText: text }),
 
@@ -72,4 +79,13 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   resetStack: () => set({ stackProposal: null, highlighted: null, pinned: false }),
+
+  setGeneratedFiles: (files) => set({ generatedFiles: files }),
+
+  updateGeneratedFile: (path, content) =>
+    set((state) => ({
+      generatedFiles: state.generatedFiles.map((f) => (f.path === path ? { ...f, content } : f)),
+    })),
+
+  setPreviewUrl: (url) => set({ previewUrl: url }),
 }));

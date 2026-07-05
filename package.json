@@ -12,6 +12,7 @@
     "@ai-sdk/openai-compatible": "^3.0.5",
     "@ai-sdk/react": "^4.0.16",
     "@base-ui/react": "^1.6.0",
+    "@webcontainer/api": "^1.6.4",
     "@xyflow/react": "^12.11.1",
     "ai": "^7.0.15",
     "class-variance-authority": "^0.7.1",
