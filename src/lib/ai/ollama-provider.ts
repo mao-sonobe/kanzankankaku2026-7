@@ -44,6 +44,11 @@ export class OllamaAIProvider implements AIProvider {
       full += chunk;
       onToken(chunk);
     }
+    if (!full.trim()) {
+      throw new Error(
+        "Ollamaから応答がありませんでした。`ollama serve`が起動しているか、設定画面でモデル名を確認してください。"
+      );
+    }
     return full;
   }
 

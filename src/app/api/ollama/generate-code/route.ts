@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
+import { toFriendlyOllamaError } from "@/lib/ai/friendly-error";
 
 const generatedFileSchema = z.object({
   path: z
@@ -199,7 +200,6 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true, result: { files } });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "コード生成に失敗しました";
-    return NextResponse.json({ ok: false, error: message }, { status: 200 });
+    return NextResponse.json({ ok: false, error: toFriendlyOllamaError(err) }, { status: 200 });
   }
 }

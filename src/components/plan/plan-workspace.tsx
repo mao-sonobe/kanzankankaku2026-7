@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
@@ -236,6 +237,14 @@ export function PlanWorkspace() {
             <StackGraph nodes={stackProposal.nodes} edges={stackProposal.edges} />
           </CardContent>
         </Card>
+      )}
+
+      {stackProposal && (
+        <div className="flex justify-end">
+          <Button size="lg" nativeButton={false} render={<Link href="/build" />}>
+            次へ: コードを生成する →
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import { generateObject } from "ai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
 import { buildChunkedFile } from "@/lib/domain/chunk-code";
+import { toFriendlyOllamaError } from "@/lib/ai/friendly-error";
 
 const BLOCK_ROLES = [
   "state",
@@ -84,7 +85,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, result: { chunked } });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "コードの分解に失敗しました";
-    return NextResponse.json({ ok: false, error: message }, { status: 200 });
+    return NextResponse.json({ ok: false, error: toFriendlyOllamaError(err) }, { status: 200 });
   }
 }

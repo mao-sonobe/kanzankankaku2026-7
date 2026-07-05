@@ -33,6 +33,23 @@ export function BuildWorkspace() {
     queueMicrotask(() => logsEndRef.current?.scrollIntoView({ block: "end" }));
   }
 
+  async function runInWebContainer(files: typeof generatedFiles) {
+    setPhase("booting");
+    const execution = getExecutionProvider();
+    await execution.boot(appendLog);
+    await execution.mountFiles(files);
+
+    setPhase("installing");
+    const url = await execution.installAndRun((line) => {
+      appendLog(line);
+      if (line.includes("npm run dev") || /Local:\s*http/i.test(line)) {
+        setPhase("running");
+      }
+    });
+    setPreviewUrl(url);
+    setPhase("ready");
+  }
+
   async function handleGenerateAndRun() {
     if (!stackProposal) return;
     setError(null);
@@ -48,21 +65,18 @@ export function BuildWorkspace() {
       const aiPaths = new Set(result.files.map((f) => f.path));
       const merged = [...scaffold.filter((f) => !aiPaths.has(f.path)), ...result.files];
       setGeneratedFiles(merged);
+      await runInWebContainer(merged);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "予期しないエラーが発生しました");
+      setPhase("error");
+    }
+  }
 
-      setPhase("booting");
-      const execution = getExecutionProvider();
-      await execution.boot(appendLog);
-      await execution.mountFiles(merged);
-
-      setPhase("installing");
-      const url = await execution.installAndRun((line) => {
-        appendLog(line);
-        if (line.includes("npm run dev") || /Local:\s*http/i.test(line)) {
-          setPhase("running");
-        }
-      });
-      setPreviewUrl(url);
-      setPhase("ready");
+  async function handleResume() {
+    setError(null);
+    setLogs([]);
+    try {
+      await runInWebContainer(generatedFiles);
     } catch (err) {
       setError(err instanceof Error ? err.message : "予期しないエラーが発生しました");
       setPhase("error");
@@ -104,14 +118,21 @@ export function BuildWorkspace() {
               </Badge>
             ))}
           </div>
-          <Button onClick={handleGenerateAndRun} disabled={isBusy}>
-            {phase === "generating" && "コードを生成中…"}
-            {phase === "booting" && "WebContainerを起動中…"}
-            {phase === "installing" && "依存関係をインストール中…"}
-            {(phase === "idle" || phase === "ready" || phase === "error") &&
-              (generatedFiles.length > 0 ? "再生成して起動する" : "コードを生成して起動する")}
-            {phase === "running" && "起動中…"}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleGenerateAndRun} disabled={isBusy}>
+              {phase === "generating" && "コードを生成中…"}
+              {phase === "booting" && "WebContainerを起動中…"}
+              {phase === "installing" && "依存関係をインストール中…"}
+              {(phase === "idle" || phase === "ready" || phase === "error") &&
+                (generatedFiles.length > 0 ? "再生成して起動する" : "コードを生成して起動する")}
+              {phase === "running" && "起動中…"}
+            </Button>
+            {phase === "idle" && generatedFiles.length > 0 && !previewUrl && (
+              <Button variant="secondary" onClick={handleResume} disabled={isBusy}>
+                保存されたコードでプレビューを再開する
+              </Button>
+            )}
+          </div>
 
           {error && (
             <Alert variant="destructive">
@@ -170,6 +191,14 @@ export function BuildWorkspace() {
             />
           </CardContent>
         </Card>
+      )}
+
+      {previewUrl && (
+        <div className="flex justify-end">
+          <Button size="lg" nativeButton={false} render={<Link href="/learn" />}>
+            次へ: コードを理解する →
+          </Button>
+        </div>
       )}
     </div>
   );

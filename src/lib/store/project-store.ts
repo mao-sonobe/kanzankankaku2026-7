@@ -1,6 +1,8 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { ChatMessage, ChunkedFile, GeneratedFile } from "@/lib/ai/types";
 import type { TechStackProposal } from "@/lib/domain/stack";
+import { idbStorage } from "./idb-storage";
 
 export interface Highlight {
   type: "phrase" | "node";
@@ -17,6 +19,7 @@ interface ProjectState {
   previewUrl: string | null;
   chunkedFiles: Record<string, ChunkedFile>;
   slotAnswers: Record<string, Record<string, string>>;
+  hasHydrated: boolean;
 
   setPlanText: (text: string) => void;
   addChatMessage: (msg: ChatMessage) => void;
@@ -31,13 +34,15 @@ interface ProjectState {
   setPreviewUrl: (url: string | null) => void;
   setChunkedFile: (path: string, chunked: ChunkedFile) => void;
   setSlotAnswer: (path: string, slotId: string, choiceId: string) => void;
+  resetProject: () => void;
+  setHasHydrated: (value: boolean) => void;
 }
 
 function sameHighlight(a: Highlight | null, b: Highlight | null): boolean {
   return !!a && !!b && a.type === b.type && a.id === b.id;
 }
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+const INITIAL_STATE = {
   planText: "",
   chatMessages: [],
   stackProposal: null,
@@ -47,62 +52,92 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   previewUrl: null,
   chunkedFiles: {},
   slotAnswers: {},
+};
 
-  setPlanText: (text) => set({ planText: text }),
+export const useProjectStore = create<ProjectState>()(
+  persist(
+    (set, get) => ({
+      ...INITIAL_STATE,
+      hasHydrated: false,
 
-  addChatMessage: (msg) =>
-    set((state) => ({ chatMessages: [...state.chatMessages, msg] })),
+      setPlanText: (text) => set({ planText: text }),
 
-  updateLastAssistantMessage: (content) =>
-    set((state) => {
-      const messages = [...state.chatMessages];
-      const last = messages[messages.length - 1];
-      if (last && last.role === "assistant") {
-        messages[messages.length - 1] = { ...last, content };
-      }
-      return { chatMessages: messages };
-    }),
+      addChatMessage: (msg) =>
+        set((state) => ({ chatMessages: [...state.chatMessages, msg] })),
 
-  setStackProposal: (proposal) => set({ stackProposal: proposal }),
+      updateLastAssistantMessage: (content) =>
+        set((state) => {
+          const messages = [...state.chatMessages];
+          const last = messages[messages.length - 1];
+          if (last && last.role === "assistant") {
+            messages[messages.length - 1] = { ...last, content };
+          }
+          return { chatMessages: messages };
+        }),
 
-  hoverHighlight: (highlight) => {
-    if (!get().pinned) set({ highlighted: highlight });
-  },
+      setStackProposal: (proposal) => set({ stackProposal: proposal }),
 
-  clearHoverHighlight: (highlight) => {
-    if (!get().pinned && sameHighlight(get().highlighted, highlight)) {
-      set({ highlighted: null });
-    }
-  },
-
-  toggleClickHighlight: (highlight) => {
-    const { pinned, highlighted } = get();
-    if (pinned && sameHighlight(highlighted, highlight)) {
-      set({ highlighted: null, pinned: false });
-    } else {
-      set({ highlighted: highlight, pinned: true });
-    }
-  },
-
-  resetStack: () => set({ stackProposal: null, highlighted: null, pinned: false }),
-
-  setGeneratedFiles: (files) => set({ generatedFiles: files, chunkedFiles: {}, slotAnswers: {} }),
-
-  updateGeneratedFile: (path, content) =>
-    set((state) => ({
-      generatedFiles: state.generatedFiles.map((f) => (f.path === path ? { ...f, content } : f)),
-    })),
-
-  setPreviewUrl: (url) => set({ previewUrl: url }),
-
-  setChunkedFile: (path, chunked) =>
-    set((state) => ({ chunkedFiles: { ...state.chunkedFiles, [path]: chunked } })),
-
-  setSlotAnswer: (path, slotId, choiceId) =>
-    set((state) => ({
-      slotAnswers: {
-        ...state.slotAnswers,
-        [path]: { ...state.slotAnswers[path], [slotId]: choiceId },
+      hoverHighlight: (highlight) => {
+        if (!get().pinned) set({ highlighted: highlight });
       },
-    })),
-}));
+
+      clearHoverHighlight: (highlight) => {
+        if (!get().pinned && sameHighlight(get().highlighted, highlight)) {
+          set({ highlighted: null });
+        }
+      },
+
+      toggleClickHighlight: (highlight) => {
+        const { pinned, highlighted } = get();
+        if (pinned && sameHighlight(highlighted, highlight)) {
+          set({ highlighted: null, pinned: false });
+        } else {
+          set({ highlighted: highlight, pinned: true });
+        }
+      },
+
+      resetStack: () => set({ stackProposal: null, highlighted: null, pinned: false }),
+
+      setGeneratedFiles: (files) =>
+        set({ generatedFiles: files, chunkedFiles: {}, slotAnswers: {}, previewUrl: null }),
+
+      updateGeneratedFile: (path, content) =>
+        set((state) => ({
+          generatedFiles: state.generatedFiles.map((f) => (f.path === path ? { ...f, content } : f)),
+        })),
+
+      setPreviewUrl: (url) => set({ previewUrl: url }),
+
+      setChunkedFile: (path, chunked) =>
+        set((state) => ({ chunkedFiles: { ...state.chunkedFiles, [path]: chunked } })),
+
+      setSlotAnswer: (path, slotId, choiceId) =>
+        set((state) => ({
+          slotAnswers: {
+            ...state.slotAnswers,
+            [path]: { ...state.slotAnswers[path], [slotId]: choiceId },
+          },
+        })),
+
+      resetProject: () => set({ ...INITIAL_STATE }),
+
+      setHasHydrated: (value) => set({ hasHydrated: value }),
+    }),
+    {
+      name: "project-state",
+      storage: createJSONStorage(() => idbStorage),
+      // WebContainerのプレビューURL・ハイライト等の一時的なUI状態は保存しない。
+      partialize: (state) => ({
+        planText: state.planText,
+        chatMessages: state.chatMessages,
+        stackProposal: state.stackProposal,
+        generatedFiles: state.generatedFiles,
+        chunkedFiles: state.chunkedFiles,
+        slotAnswers: state.slotAnswers,
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
+    }
+  )
+);

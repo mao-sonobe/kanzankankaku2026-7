@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { DEFAULT_AI_SETTINGS, loadAISettings, saveAISettings } from "@/lib/ai/settings";
+import { useProjectStore } from "@/lib/store/project-store";
 
 type ConnectionState =
   | { status: "idle" }
@@ -20,6 +21,9 @@ export default function SettingsPage() {
   const [model, setModel] = useState(DEFAULT_AI_SETTINGS.model);
   const [conn, setConn] = useState<ConnectionState>({ status: "idle" });
   const [saved, setSaved] = useState(false);
+  const [resetConfirm, setResetConfirm] = useState(false);
+  const resetProject = useProjectStore((s) => s.resetProject);
+  const planText = useProjectStore((s) => s.planText);
 
   useEffect(() => {
     const settings = loadAISettings();
@@ -134,6 +138,42 @@ export default function SettingsPage() {
               <AlertTitle>接続に失敗しました</AlertTitle>
               <AlertDescription>{conn.message}</AlertDescription>
             </Alert>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardHeader>
+          <CardTitle>プロジェクトのリセット</CardTitle>
+          <CardDescription>
+            企画書・技術スタック・生成コード・学習の進捗をすべて削除し、新しいプロジェクトを始めます。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!resetConfirm ? (
+            <Button
+              variant="destructive"
+              disabled={!planText}
+              onClick={() => setResetConfirm(true)}
+            >
+              プロジェクトをリセットする
+            </Button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-destructive">本当に削除しますか?元に戻せません。</span>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  resetProject();
+                  setResetConfirm(false);
+                }}
+              >
+                削除する
+              </Button>
+              <Button variant="ghost" onClick={() => setResetConfirm(false)}>
+                キャンセル
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
