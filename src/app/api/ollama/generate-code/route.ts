@@ -99,6 +99,15 @@ function stripGlobalCssImports(path: string, content: string): string {
     .join("\n");
 }
 
+/** モデルがJSファイルの末尾に生のCSSルールを紛れ込ませることがあるため、それ以降を切り捨てる。 */
+function stripTrailingCssBlock(path: string, content: string): string {
+  if (path === "app/globals.css") return content;
+  const lines = content.split("\n");
+  const cssSelectorLine = lines.findIndex((l) => /^\s*[.#][a-zA-Z][\w-]*(\s*,\s*[.#][a-zA-Z][\w-]*)*\s*\{\s*$/.test(l));
+  if (cssSelectorLine === -1) return content;
+  return lines.slice(0, cssSelectorLine).join("\n").trimEnd() + "\n";
+}
+
 /** モデルがコードブロックのMarkdown記法を混入させることがあるため取り除く。 */
 function stripMarkdownFence(content: string): string {
   const trimmed = content.trim();
@@ -122,6 +131,7 @@ function postProcessFile(path: string, content: string): string {
   if (path.endsWith(".js") || path.endsWith(".jsx")) {
     result = stripStrayUseClientStatements(result);
     result = stripGlobalCssImports(path, result);
+    result = stripTrailingCssBlock(path, result);
     result = ensureReactImport(result);
     result = ensureNamedHookImports(result);
     result = ensureUseClientDirective(result);
@@ -172,10 +182,18 @@ export async function POST(req: NextRequest) {
         },
       ],
     });
-    const files = object.files.map((f) => {
-      const path = normalizeFilePath(f.path);
-      return { path, content: postProcessFile(path, f.content) };
-    });
+    const files = object.files
+      .filter((f) => f.content.trim().length > 0)
+      .map((f) => {
+        const path = normalizeFilePath(f.path);
+        return { path, content: postProcessFile(path, f.content) };
+      });
+    if (files.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "有効なコードが生成されませんでした。もう一度お試しください。" },
+        { status: 200 }
+      );
+    }
     if (!files.some((f) => f.path === "app/page.js")) {
       files[0].path = "app/page.js";
     }

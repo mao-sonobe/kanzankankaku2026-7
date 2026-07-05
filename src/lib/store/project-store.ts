@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ChatMessage, GeneratedFile } from "@/lib/ai/types";
+import type { ChatMessage, ChunkedFile, GeneratedFile } from "@/lib/ai/types";
 import type { TechStackProposal } from "@/lib/domain/stack";
 
 export interface Highlight {
@@ -15,6 +15,8 @@ interface ProjectState {
   pinned: boolean;
   generatedFiles: GeneratedFile[];
   previewUrl: string | null;
+  chunkedFiles: Record<string, ChunkedFile>;
+  slotAnswers: Record<string, Record<string, string>>;
 
   setPlanText: (text: string) => void;
   addChatMessage: (msg: ChatMessage) => void;
@@ -27,6 +29,8 @@ interface ProjectState {
   setGeneratedFiles: (files: GeneratedFile[]) => void;
   updateGeneratedFile: (path: string, content: string) => void;
   setPreviewUrl: (url: string | null) => void;
+  setChunkedFile: (path: string, chunked: ChunkedFile) => void;
+  setSlotAnswer: (path: string, slotId: string, choiceId: string) => void;
 }
 
 function sameHighlight(a: Highlight | null, b: Highlight | null): boolean {
@@ -41,6 +45,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   pinned: false,
   generatedFiles: [],
   previewUrl: null,
+  chunkedFiles: {},
+  slotAnswers: {},
 
   setPlanText: (text) => set({ planText: text }),
 
@@ -80,7 +86,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   resetStack: () => set({ stackProposal: null, highlighted: null, pinned: false }),
 
-  setGeneratedFiles: (files) => set({ generatedFiles: files }),
+  setGeneratedFiles: (files) => set({ generatedFiles: files, chunkedFiles: {}, slotAnswers: {} }),
 
   updateGeneratedFile: (path, content) =>
     set((state) => ({
@@ -88,4 +94,15 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     })),
 
   setPreviewUrl: (url) => set({ previewUrl: url }),
+
+  setChunkedFile: (path, chunked) =>
+    set((state) => ({ chunkedFiles: { ...state.chunkedFiles, [path]: chunked } })),
+
+  setSlotAnswer: (path, slotId, choiceId) =>
+    set((state) => ({
+      slotAnswers: {
+        ...state.slotAnswers,
+        [path]: { ...state.slotAnswers[path], [slotId]: choiceId },
+      },
+    })),
 }));
