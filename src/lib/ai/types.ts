@@ -1,6 +1,8 @@
 // AIプロバイダーの抽象化。呼び出し元（対話UI・コード生成・チャンク化処理）は
 // このインターフェースにのみ依存し、具体的なプロバイダー実装（Ollama/将来のGemini等）を意識しない。
 
+import type { TechStackProposal } from "@/lib/domain/stack";
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -8,6 +10,13 @@ export interface ChatMessage {
 
 export interface ChatOptions {
   messages: ChatMessage[];
+  signal?: AbortSignal;
+}
+
+export interface ProposeTechStackOptions {
+  planText: string;
+  /** これまでの対話履歴（企画の深掘り質問と回答） */
+  chatHistory: ChatMessage[];
   signal?: AbortSignal;
 }
 
@@ -78,6 +87,8 @@ export interface ChunkCodeResult {
 export interface AIProvider {
   /** 対話形式のチャット（ストリーミング）。chunkごとにonTokenが呼ばれる */
   chat(options: ChatOptions, onToken: (token: string) => void): Promise<string>;
+  /** 企画書と対話履歴から技術スタックを提案する（構造化出力） */
+  proposeTechStack(options: ProposeTechStackOptions): Promise<TechStackProposal>;
   generateCode(options: GenerateCodeOptions): Promise<GenerateCodeResult>;
   chunkCode(options: ChunkCodeOptions): Promise<ChunkCodeResult>;
   /** 疎通確認。利用可能なモデル一覧を返す */
