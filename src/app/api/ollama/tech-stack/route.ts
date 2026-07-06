@@ -20,7 +20,12 @@ const techStackSchema = z.object({
     .array(
       z.object({
         id: z.string(),
-        label: z.string().describe("技術要素名（例: Next.js, PostgreSQL）"),
+        label: z
+          .string()
+          .describe(
+            "実際にインストール/採用する固有の技術名（例: Node.js, Next.js, PostgreSQL, Redis, Docker, Vercel）。" +
+              "「バックエンド」「データベース」のような抽象的な総称は禁止"
+          ),
         category: z.enum(STACK_CATEGORIES),
         description: z.string().describe("この技術が企画の中でどんな役割を果たすかの説明"),
         relatedPhraseIds: z.array(z.string()).describe("関連するphrasesのid一覧"),
@@ -67,6 +72,9 @@ export async function POST(req: NextRequest) {
             "- phrases.text は企画書本文から一字一句そのままコピーした短い抜粋(5〜20文字程度)にしてください。要約や言い換えは禁止です。\n" +
             "- 例: 企画書が「複数人でリアルタイムに編集できるようにしたい」を含む場合、phrases.text は\"リアルタイムに編集\"のように本文中の連続した文字列そのものにしてください。\n" +
             "- 各技術ノード(nodes)は、なぜその技術が必要かをdescriptionで説明し、関連するphrasesのidをrelatedPhraseIdsに列挙してください。\n" +
+            "- nodes.label は必ず実在する固有の技術名にしてください(例: Node.js, Next.js, React, PostgreSQL, Redis, Prisma, Docker, Vercel, AWS S3)。" +
+            "「バックエンド」「データベース」「インフラ」のような抽象的な総称や、カテゴリ名そのままの言い換えは禁止です。\n" +
+            "- 少なくとも1つは実行環境/言語(例: Node.js)、1つはフレームワーク、必要なら永続化層・インフラのノードも固有名詞で含めてください。\n" +
             "- カテゴリは frontend/backend/infra/data/other のいずれかにしてください。\n" +
             "- ノード数は3〜8個程度、フレーズ数は3〜8個程度に抑えてください。",
         },
