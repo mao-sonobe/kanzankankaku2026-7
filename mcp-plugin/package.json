@@ -6,10 +6,14 @@
   "description": "Claude Codeでコーディング中に、選んだ技術スタックの関係と生成コードの理解ポイントをウィジェットとして可視化するMCPサーバー",
   "main": "src/index.mjs",
   "scripts": {
-    "start": "node src/index.mjs"
+    "start": "node src/index.mjs",
+    "build": "esbuild src/index.mjs --bundle --platform=node --format=esm --outfile=dist/server.bundle.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
   }
 }
