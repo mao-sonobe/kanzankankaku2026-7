@@ -6,6 +6,7 @@ export interface RawBlank {
   role: BlockRole;
   label: string;
   wrongAnswers: string[];
+  relatedStackNodeId?: string;
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -22,7 +23,12 @@ function shuffle<T>(items: T[]): T[] {
  * text/slotのセグメント列を構築する。「text」部分は元コードの厳密なスライスなので、
  * 全スロットに正解を入れれば元のコードと完全に一致することが保証される。
  */
-export function buildChunkedFile(path: string, content: string, blanks: RawBlank[]): ChunkedFile {
+export function buildChunkedFile(
+  path: string,
+  content: string,
+  blanks: RawBlank[],
+  summary: string
+): ChunkedFile {
   // CodeMirrorのウィジェット描画を単純にするため、複数行にまたがる空欄は除外する。
   const accepted = locateNonOverlapping(content, blanks, (b) => b.text).filter(
     (m) => !content.slice(m.start, m.end).includes("\n")
@@ -53,6 +59,7 @@ export function buildChunkedFile(path: string, content: string, blanks: RawBlank
       role: m.item.role,
       label: m.item.label,
       choices,
+      relatedStackNodeId: m.item.relatedStackNodeId,
     };
     segments.push({ type: "slot", slot });
     cursor = m.end;
@@ -62,7 +69,7 @@ export function buildChunkedFile(path: string, content: string, blanks: RawBlank
     segments.push({ type: "text", content: content.slice(cursor) });
   }
 
-  return { path, segments };
+  return { path, summary, segments };
 }
 
 /** 未回答のスロットに入れる、構文的に無害なプレースホルダー。 */

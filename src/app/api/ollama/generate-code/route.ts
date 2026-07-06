@@ -118,11 +118,17 @@ function stripMarkdownFence(content: string): string {
 
 /** ローカルLLMは "./page.js" や "page.js" のようにapp/配下から外れたパスを返すことがあるため矯正する。 */
 function normalizeFilePath(path: string): string {
-  const cleaned = path.trim().replace(/^\.\/+/, "").replace(/^\/+/, "");
+  const cleaned = path
+    .trim()
+    .replace(/^\.\/+/, "")
+    .replace(/^\/+/, "")
+    .replace(/^src\/+/, "");
   const baseName = cleaned.split("/").pop() ?? cleaned;
   const isRouteFile = /^(page|layout)\.(js|jsx|ts|tsx)$/.test(baseName);
   if (isRouteFile && !cleaned.startsWith("app/")) {
-    return `app/${baseName}`;
+    // ネストしたフォルダ構造(例: counter/page.js)は保持したままapp/配下に移す。
+    // basenameだけを使うと、異なるフォルダの複数ファイルが同じapp/page.jsに衝突しうる。
+    return `app/${cleaned}`;
   }
   return cleaned;
 }
@@ -183,12 +189,15 @@ export async function POST(req: NextRequest) {
         },
       ],
     });
-    const files = object.files
+    const normalized = object.files
       .filter((f) => f.content.trim().length > 0)
       .map((f) => {
         const path = normalizeFilePath(f.path);
         return { path, content: postProcessFile(path, f.content) };
       });
+    // 正規化後にパスが衝突した場合(異なる意図のファイルが同じパスになった場合)は
+    // 後勝ちで一意化し、無警告の上書きではなく決定的な結果にする。
+    const files = Array.from(new Map(normalized.map((f) => [f.path, f])).values());
     if (files.length === 0) {
       return NextResponse.json(
         { ok: false, error: "有効なコードが生成されませんでした。もう一度お試しください。" },

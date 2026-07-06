@@ -58,11 +58,15 @@ export interface CodeBlockSlot {
   role: BlockRole;
   label: string;
   choices: CodeBlockChoice[];
+  /** この空欄が体現する技術スタックノード（Phase1で選定したもの）のid。対応がなければ省略。 */
+  relatedStackNodeId?: string;
 }
 
 /** チャンク化されたファイル: ゴーストコード + 空欄スロットの並び */
 export interface ChunkedFile {
   path: string;
+  /** このファイルで何が重要かを2〜3文で説明した概要 */
+  summary: string;
   /** ファイル内容をスロットとプレーンテキストの断片に分解したもの（順序通りに連結すると元コードに戻る） */
   segments: (
     | { type: "text"; content: string }
@@ -72,6 +76,8 @@ export interface ChunkedFile {
 
 export interface ChunkCodeOptions {
   file: GeneratedFile;
+  /** Phase1で確定した技術スタックノード。空欄と技術要素を紐付けるために使う。 */
+  stackNodes: { id: string; label: string; category: string; description: string }[];
   signal?: AbortSignal;
 }
 

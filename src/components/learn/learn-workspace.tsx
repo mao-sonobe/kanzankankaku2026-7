@@ -22,6 +22,8 @@ export function LearnWorkspace() {
   const setChunkedFile = useProjectStore((s) => s.setChunkedFile);
   const slotAnswers = useProjectStore((s) => s.slotAnswers);
   const setSlotAnswer = useProjectStore((s) => s.setSlotAnswer);
+  const stackNodes = useProjectStore((s) => s.stackProposal?.nodes ?? []);
+  const toggleClickHighlight = useProjectStore((s) => s.toggleClickHighlight);
 
   const learnableFiles = useMemo(
     () => generatedFiles.filter((f) => !SCAFFOLD_PATHS.has(f.path)),
@@ -43,6 +45,18 @@ export function LearnWorkspace() {
     (s) => s.type === "slot" && s.slot.id === activeSlotId
   );
   const activeSlotData = activeSlot?.type === "slot" ? activeSlot.slot : null;
+  const activeStackNode = activeSlotData?.relatedStackNodeId
+    ? stackNodes.find((n) => n.id === activeSlotData.relatedStackNodeId) ?? null
+    : null;
+
+  function handleSlotClick(slotId: string) {
+    setActiveSlotId(slotId);
+    const slot = chunked?.segments.find(
+      (s) => s.type === "slot" && s.slot.id === slotId
+    );
+    const nodeId = slot?.type === "slot" ? slot.slot.relatedStackNodeId : undefined;
+    if (nodeId) toggleClickHighlight({ type: "node", id: nodeId });
+  }
 
   const totalSlots = chunked?.segments.filter((s) => s.type === "slot").length ?? 0;
   const correctCount =
@@ -56,7 +70,7 @@ export function LearnWorkspace() {
     setIsChunking(true);
     try {
       const provider = getAIProvider();
-      const result = await provider.chunkCode({ file: currentFile });
+      const result = await provider.chunkCode({ file: currentFile, stackNodes });
       setChunkedFile(currentFile.path, result.chunked);
     } catch (err) {
       setChunkError(err instanceof Error ? err.message : "コードの分解に失敗しました");
@@ -146,11 +160,17 @@ export function LearnWorkspace() {
               </CardDescription>
             </CardHeader>
             <CardContent>
+              {chunked.summary && (
+                <Alert className="mb-3">
+                  <AlertTitle>このファイルのポイント</AlertTitle>
+                  <AlertDescription>{chunked.summary}</AlertDescription>
+                </Alert>
+              )}
               <CodeEditor
                 chunked={chunked}
                 answers={answers}
                 activeSlotId={activeSlotId}
-                onSlotClick={setActiveSlotId}
+                onSlotClick={handleSlotClick}
               />
               {totalSlots > 0 && correctCount === totalSlots && (
                 <Alert className="mt-3">
@@ -174,12 +194,20 @@ export function LearnWorkspace() {
               <CardHeader>
                 <CardTitle>ブロックパレット</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <BlockPalette
                   slot={activeSlotData ?? null}
                   selectedChoiceId={activeSlotId ? answers[activeSlotId] : undefined}
                   onChoose={handleChoose}
                 />
+                {activeStackNode && (
+                  <Alert>
+                    <AlertTitle>技術スタックとの対応</AlertTitle>
+                    <AlertDescription>
+                      この空欄は「{activeStackNode.label}」を実現しています。{activeStackNode.description}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </CardContent>
             </Card>
 

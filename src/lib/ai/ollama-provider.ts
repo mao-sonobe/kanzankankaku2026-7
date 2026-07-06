@@ -98,6 +98,7 @@ export class OllamaAIProvider implements AIProvider {
         endpoint: this.settings.endpoint,
         model: this.settings.model,
         file: options.file,
+        stackNodes: options.stackNodes,
       }),
       signal: options.signal,
     });
