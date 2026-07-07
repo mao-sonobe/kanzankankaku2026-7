@@ -8,6 +8,7 @@ import type { BlockRole, ChunkedFile } from "@/lib/ai/types";
 import type { StackCategory, TechStackNode } from "@/lib/domain/stack";
 import { buildFileContentWithRanges, type SlotRange } from "@/lib/domain/chunk-code";
 import { BLOCK_ROLE_LABEL } from "@/lib/domain/block-colors";
+import { techIconUrl } from "@/lib/domain/tech-icon";
 
 // CodeMirrorのDecorationはTailwindの動的クラス名を解決できないため、
 // エディタ内の役割カラーはここで実際の色値として定義する(パレット側はTailwindクラスのままでよい)。
@@ -62,7 +63,19 @@ class SlotWidget extends WidgetType {
     if (this.relatedNode) {
       const tech = document.createElement("span");
       tech.className = "cm-slot-tech";
-      tech.textContent = this.relatedNode.label;
+      const iconUrl = techIconUrl(this.relatedNode.label);
+      if (iconUrl) {
+        const icon = document.createElement("img");
+        icon.src = iconUrl;
+        icon.alt = "";
+        icon.width = 11;
+        icon.height = 11;
+        icon.style.verticalAlign = "-1px";
+        icon.style.marginRight = "3px";
+        icon.addEventListener("error", () => icon.remove());
+        tech.appendChild(icon);
+      }
+      tech.appendChild(document.createTextNode(this.relatedNode.label));
       const hex = CATEGORY_HEX[this.relatedNode.category];
       tech.style.backgroundColor = hex.bg;
       tech.style.border = `1px solid ${hex.border}`;

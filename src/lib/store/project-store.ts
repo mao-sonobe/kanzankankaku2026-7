@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ChatMessage, ChunkedFile, GeneratedFile } from "@/lib/ai/types";
 import type { TechStackProposal } from "@/lib/domain/stack";
-import { reconcileQuizState, type StackQuizState, type StackQuizStatus } from "@/lib/domain/stack-quiz";
+import { reconcileQuizState, type StackQuizEntry, type StackQuizState } from "@/lib/domain/stack-quiz";
 import type { DataFlowResult } from "@/lib/domain/data-flow";
 import { idbStorage } from "./idb-storage";
 
@@ -40,7 +40,7 @@ interface ProjectState {
     proposal: TechStackProposal | null,
     opts?: { regenerated?: boolean }
   ) => void;
-  answerQuizNode: (nodeId: string, status: StackQuizStatus) => void;
+  answerQuizNode: (nodeId: string, entry: StackQuizEntry) => void;
   skipQuiz: () => void;
   setDataFlow: (result: DataFlowResult | null) => void;
   hoverHighlight: (highlight: Highlight) => void;
@@ -116,8 +116,8 @@ export const useProjectStore = create<ProjectState>()(
         }
       },
 
-      answerQuizNode: (nodeId, status) =>
-        set((state) => ({ stackQuiz: { ...state.stackQuiz, [nodeId]: status } })),
+      answerQuizNode: (nodeId, entry) =>
+        set((state) => ({ stackQuiz: { ...state.stackQuiz, [nodeId]: entry } })),
 
       skipQuiz: () => set({ stackQuizSkipped: true }),
 

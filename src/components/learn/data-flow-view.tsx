@@ -15,6 +15,7 @@ import { locateSpansInFile, type DataFlowSpan } from "@/lib/domain/data-flow";
 import { orderPipeline } from "@/lib/domain/stack-pipeline";
 import { CATEGORY_COLORS } from "@/lib/domain/stack-colors";
 import { CATEGORY_HEX } from "./code-editor";
+import { TechIcon } from "@/components/ui/tech-icon";
 import { cn } from "@/lib/utils";
 
 /**
@@ -69,14 +70,6 @@ export function DataFlowView({ onProceedToFill }: { onProceedToFill: () => void 
     const edge = edgeById.get(span.edgeId);
     const node = edge ? nodeById.get(edge.target) ?? nodeById.get(edge.source) : undefined;
     return node?.category ?? "other";
-  }
-
-  function edgeLabel(span: DataFlowSpan): string {
-    const edge = edgeById.get(span.edgeId);
-    if (!edge) return "";
-    const source = nodeById.get(edge.source)?.label ?? edge.source;
-    const target = nodeById.get(edge.target)?.label ?? edge.target;
-    return `${source} → ${target}`;
   }
 
   const spansByEdge = useMemo(() => {
@@ -261,6 +254,7 @@ export function DataFlowView({ onProceedToFill }: { onProceedToFill: () => void 
                 <div key={node.id} className="w-full">
                   <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-1.5">
                     <span className={cn("size-2 rounded-full", CATEGORY_COLORS[node.category].dot)} />
+                    <TechIcon name={node.label} size={16} />
                     <p className="text-sm font-medium">{node.label}</p>
                   </div>
                   {i < pipeline.length - 1 && <div className="ml-4 h-3 border-l-2 border-dashed" />}
@@ -269,11 +263,19 @@ export function DataFlowView({ onProceedToFill }: { onProceedToFill: () => void 
             </div>
 
             <div className="space-y-3">
-              {[...spansByEdge.entries()].map(([edgeId, edgeSpans]) => (
+              {[...spansByEdge.entries()].map(([edgeId, edgeSpans]) => {
+                const edge = edgeById.get(edgeId);
+                const sourceLabel = edge ? nodeById.get(edge.source)?.label ?? edge.source : "";
+                const targetLabel = edge ? nodeById.get(edge.target)?.label ?? edge.target : "";
+                return (
                 <div key={edgeId} className="space-y-1.5">
-                  <p className="text-xs font-semibold text-muted-foreground">
-                    {edgeLabel(edgeSpans[0])}
-                    {edgeById.get(edgeId)?.label ? `(${edgeById.get(edgeId)?.label})` : ""}
+                  <p className="flex items-center gap-1 text-xs font-semibold text-muted-foreground">
+                    <TechIcon name={sourceLabel} size={14} />
+                    {sourceLabel}
+                    <span>→</span>
+                    <TechIcon name={targetLabel} size={14} />
+                    {targetLabel}
+                    {edge?.label ? `(${edge.label})` : ""}
                   </p>
                   {edgeSpans.map((span) => {
                     const colors = CATEGORY_COLORS[spanCategory(span)];
@@ -297,7 +299,8 @@ export function DataFlowView({ onProceedToFill }: { onProceedToFill: () => void 
                     );
                   })}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>

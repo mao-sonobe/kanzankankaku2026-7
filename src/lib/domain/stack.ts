@@ -18,14 +18,23 @@ export interface PlanPhrase {
   category: StackCategory;
 }
 
+/** STEP3クイズの誤答候補。reasonは「なぜ今回は最適でないか」の1文。 */
+export interface StackWrongAnswer {
+  label: string;
+  reason?: string;
+}
+
 export interface TechStackNode {
   id: string;
   label: string;
   category: StackCategory;
   description: string;
   relatedPhraseIds: string[];
-  /** STEP3の4択クイズ用。labelの代替になりそうな、もっともらしいが今回は最適でない技術名。 */
-  wrongAnswers?: string[];
+  /**
+   * STEP3の4択クイズ用。labelの代替になりそうな、もっともらしいが今回は最適でない技術。
+   * 旧形式(string[])の永続化データも読めるよう両対応。
+   */
+  wrongAnswers?: (string | StackWrongAnswer)[];
 }
 
 export interface TechStackEdge {

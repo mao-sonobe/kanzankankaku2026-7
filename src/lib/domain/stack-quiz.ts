@@ -1,12 +1,50 @@
 // STEP3の技術スタック4択クイズのドメインロジック。
-// 正解=AIが提案したnode.label、誤答=node.wrongAnswers(tech-stack APIが生成)。
+// 正解=AIが提案したnode.label、誤答=node.wrongAnswers(tech-stack APIが生成、不正解理由つき)。
 
-import type { TechStackNode, TechStackProposal } from "./stack";
+import type { StackWrongAnswer, TechStackNode, TechStackProposal } from "./stack";
 
 export type StackQuizStatus = "correct" | "wrong" | "revealed";
 
-/** nodeId -> クイズの回答状況 */
-export type StackQuizState = Record<string, StackQuizStatus>;
+/** 1ノード分の回答。chosenは誤答時に選んだ技術名(不正解理由の表示に使う)。 */
+export interface StackQuizEntry {
+  status: StackQuizStatus;
+  chosen?: string;
+}
+
+/**
+ * nodeId -> クイズの回答状況。
+ * 旧形式(値がstatus文字列のみ)の永続化データも読めるよう両対応。
+ */
+export type StackQuizState = Record<string, StackQuizEntry | StackQuizStatus>;
+
+/** 新旧形式を吸収して回答エントリを取り出す。 */
+export function getQuizEntry(state: StackQuizState, nodeId: string): StackQuizEntry | undefined {
+  const v = state[nodeId];
+  if (!v) return undefined;
+  return typeof v === "string" ? { status: v } : v;
+}
+
+export interface QuizChoice {
+  label: string;
+  isCorrect: boolean;
+  /** 誤答の場合の「なぜ最適でないか」(正解にはない) */
+  reason?: string;
+}
+
+/** 新旧形式(string / {label, reason})を吸収して誤答リストを正規化する。 */
+export function normalizeWrongAnswers(node: TechStackNode): StackWrongAnswer[] {
+  const seen = new Set<string>();
+  const result: StackWrongAnswer[] = [];
+  for (const w of node.wrongAnswers ?? []) {
+    const entry = typeof w === "string" ? { label: w } : w;
+    const label = entry.label?.trim();
+    if (!label || label === node.label.trim() || seen.has(label)) continue;
+    seen.add(label);
+    result.push({ label, reason: entry.reason?.trim() || undefined });
+    if (result.length >= 3) break;
+  }
+  return result;
+}
 
 /** node.idから決定的に選択肢を並べるためのシード付き乱数(再描画・リロードで順序が変わらないように)。 */
 function seededShuffle<T>(items: T[], seed: string): T[] {
@@ -30,13 +68,16 @@ function seededShuffle<T>(items: T[], seed: string): T[] {
  * ノードの4択の選択肢を返す。使える誤答がない場合(Ollama等、wrongAnswers未対応の提案)は
  * nullを返し、呼び出し側はクイズなしで最初から開示する。
  */
-export function buildQuizChoices(node: TechStackNode): string[] | null {
-  const wrong = [...new Set(node.wrongAnswers ?? [])]
-    .map((w) => w.trim())
-    .filter((w) => w && w !== node.label.trim())
-    .slice(0, 3);
+export function buildQuizChoices(node: TechStackNode): QuizChoice[] | null {
+  const wrong = normalizeWrongAnswers(node);
   if (wrong.length === 0) return null;
-  return seededShuffle([node.label, ...wrong], node.id);
+  return seededShuffle(
+    [
+      { label: node.label, isCorrect: true },
+      ...wrong.map((w) => ({ label: w.label, isCorrect: false, reason: w.reason })),
+    ],
+    node.id
+  );
 }
 
 /**
@@ -55,10 +96,11 @@ export function reconcileQuizState(
   const result: StackQuizState = {};
   for (const node of next.nodes) {
     const prevLabel = prevLabelById.get(node.id);
-    if (prevLabel === node.label && prev[node.id]) {
-      result[node.id] = prev[node.id];
+    const prevEntry = getQuizEntry(prev, node.id);
+    if (prevLabel === node.label && prevEntry) {
+      result[node.id] = prevEntry;
     } else {
-      result[node.id] = "revealed";
+      result[node.id] = { status: "revealed" };
     }
   }
   return result;
@@ -71,5 +113,5 @@ export function isQuizComplete(
   skipped: boolean
 ): boolean {
   if (skipped) return true;
-  return proposal.nodes.every((n) => quizState[n.id] || buildQuizChoices(n) === null);
+  return proposal.nodes.every((n) => getQuizEntry(quizState, n.id) || buildQuizChoices(n) === null);
 }

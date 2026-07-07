@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { TechIcon } from "@/components/ui/tech-icon";
 import { useProjectStore } from "@/lib/store/project-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
 import { getExecutionProvider } from "@/lib/execution/webcontainer-provider";
@@ -113,7 +114,8 @@ export function BuildWorkspace() {
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {stackProposal.nodes.map((node) => (
-              <Badge key={node.id} variant="outline">
+              <Badge key={node.id} variant="outline" className="gap-1.5">
+                <TechIcon name={node.label} size={14} />
                 {node.label}
               </Badge>
             ))}

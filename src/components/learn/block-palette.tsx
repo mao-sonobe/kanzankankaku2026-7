@@ -3,6 +3,7 @@
 import { cn } from "@/lib/utils";
 import { BLOCK_ROLE_COLORS, BLOCK_ROLE_LABEL } from "@/lib/domain/block-colors";
 import { CATEGORY_COLORS } from "@/lib/domain/stack-colors";
+import { TechIcon } from "@/components/ui/tech-icon";
 import type { CodeBlockSlot } from "@/lib/ai/types";
 import type { TechStackNode } from "@/lib/domain/stack";
 
@@ -52,6 +53,7 @@ export function BlockPalette({
             <span
               className={cn("size-1.5 rounded-full", CATEGORY_COLORS[relatedNodeInfo.node.category].dot)}
             />
+            <TechIcon name={relatedNodeInfo.node.label} size={14} />
             {relatedNodeInfo.edgeText
               ? `${relatedNodeInfo.edgeText} の受け渡し`
               : `${relatedNodeInfo.node.label} に関わる部分`}

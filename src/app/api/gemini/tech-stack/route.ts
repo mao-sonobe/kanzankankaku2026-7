@@ -30,13 +30,23 @@ const techStackSchema = z.object({
         description: z.string().describe("この技術が企画の中でどんな役割を果たすかの説明"),
         relatedPhraseIds: z.array(z.string()).describe("関連するphrasesのid一覧"),
         wrongAnswers: z
-          .array(z.string())
+          .array(
+            z.object({
+              label: z
+                .string()
+                .describe(
+                  "labelと同じ役割を担えそうな実在の技術名(例: label=Next.js なら Nuxt.js)。labelや他ノードのlabelとの重複は禁止"
+                ),
+              reason: z
+                .string()
+                .describe(
+                  "その技術自体は実在の選択肢だが、今回の企画には最適でない理由(初心者向けの1文。例: 「Vueベースのため、Reactの学習資産を活かしにくい」)"
+                ),
+            })
+          )
           .min(3)
           .max(3)
-          .describe(
-            "labelと同じ役割を担えそうな実在の技術名で、今回の企画には最適でないものを3つ" +
-              "(例: label=Next.js なら Nuxt.js, SvelteKit, Remix)。labelや他ノードのlabelとの重複は禁止"
-          ),
+          .describe("4択クイズ用の誤答3つ(不正解理由つき)"),
       })
     )
     .describe("提案する技術スタックのノード一覧"),
@@ -80,9 +90,11 @@ export async function POST(req: NextRequest) {
         "「バックエンド」「データベース」「インフラ」のような抽象的な総称や、カテゴリ名そのままの言い換えは禁止です。\n" +
         "- 少なくとも1つは実行環境/言語(例: Node.js)、1つはフレームワーク、必要なら永続化層・インフラのノードも固有名詞で含めてください。\n" +
         "- カテゴリは frontend/backend/infra/data/other のいずれかにしてください。\n" +
-        "- 各ノードのwrongAnswersには、その役割を担えそうな実在の代替技術名を必ず3つ挙げてください" +
+        "- 各ノードのwrongAnswersには、その役割を担えそうな実在の代替技術を必ず3つ挙げてください" +
         "(学習者向けの4択クイズの誤答として使います)。labelと同カテゴリ・同粒度の固有名詞にし、" +
-        "label自体や他ノードのlabelと重複させないでください。\n" +
+        "label自体や他ノードのlabelと重複させないでください。" +
+        "各誤答のreasonには「その技術も実在の選択肢だが、今回の企画には最適でない理由」を" +
+        "初心者に分かる1文で書いてください(技術をけなすのではなく、企画との相性で説明する)。\n" +
         "- ノード数は3〜8個程度、フレーズ数は3〜8個程度に抑えてください。" +
         (isRegeneration
           ? "\n\n【再生成モード】現在の提案(JSON)とユーザーの変更要望が与えられます。" +
@@ -100,13 +112,18 @@ export async function POST(req: NextRequest) {
     // 誤答の重複・正解との重複を除去(空になった場合はUI側がクイズなしで開示する)。
     const proposal = {
       ...object,
-      nodes: object.nodes.map((node) => ({
-        ...node,
-        wrongAnswers: [...new Set(node.wrongAnswers)]
-          .map((w) => w.trim())
-          .filter((w) => w && w !== node.label.trim())
-          .slice(0, 3),
-      })),
+      nodes: object.nodes.map((node) => {
+        const seen = new Set<string>();
+        const wrongAnswers = node.wrongAnswers
+          .map((w) => ({ label: w.label.trim(), reason: w.reason.trim() }))
+          .filter((w) => {
+            if (!w.label || w.label === node.label.trim() || seen.has(w.label)) return false;
+            seen.add(w.label);
+            return true;
+          })
+          .slice(0, 3);
+        return { ...node, wrongAnswers };
+      }),
     };
     return NextResponse.json({ ok: true, proposal });
   } catch (err) {

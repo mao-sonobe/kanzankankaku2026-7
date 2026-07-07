@@ -7,8 +7,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { CATEGORY_COLORS } from "@/lib/domain/stack-colors";
 import type { TechStackProposal } from "@/lib/domain/stack";
 import { orderPipeline } from "@/lib/domain/stack-pipeline";
-import { buildQuizChoices, isQuizComplete } from "@/lib/domain/stack-quiz";
+import { buildQuizChoices, getQuizEntry, isQuizComplete } from "@/lib/domain/stack-quiz";
 import { useProjectStore } from "@/lib/store/project-store";
+import { TechIcon } from "@/components/ui/tech-icon";
 import { StackQuizCard } from "./stack-quiz-card";
 import { cn } from "@/lib/utils";
 
@@ -37,12 +38,12 @@ export function StepProposal({
 
   const quizComplete = isQuizComplete(proposal, stackQuiz, stackQuizSkipped);
   const quizNodes = proposal.nodes.filter((n) => buildQuizChoices(n) !== null);
-  const answeredCount = quizNodes.filter((n) => stackQuiz[n.id]).length;
+  const answeredCount = quizNodes.filter((n) => getQuizEntry(stackQuiz, n.id)).length;
 
-  function effectiveStatus(nodeId: string) {
-    const status = stackQuiz[nodeId];
-    if (status) return status;
-    return stackQuizSkipped ? ("revealed" as const) : undefined;
+  function effectiveEntry(nodeId: string) {
+    const entry = getQuizEntry(stackQuiz, nodeId);
+    if (entry) return entry;
+    return stackQuizSkipped ? ({ status: "revealed" } as const) : undefined;
   }
 
   function handleRegenerate() {
@@ -84,8 +85,8 @@ export function StepProposal({
               <StackQuizCard
                 key={node.id}
                 node={node}
-                status={effectiveStatus(node.id)}
-                onAnswer={(status) => answerQuizNode(node.id, status)}
+                entry={effectiveEntry(node.id)}
+                onAnswer={(entry) => answerQuizNode(node.id, entry)}
               />
             ))}
           </div>
@@ -95,7 +96,7 @@ export function StepProposal({
           <p className="mb-3 text-xs font-medium text-muted-foreground">パイプライン</p>
           <div className="flex flex-col items-start gap-1">
             {pipeline.map((node, i) => {
-              const revealed = effectiveStatus(node.id) !== undefined || buildQuizChoices(node) === null;
+              const revealed = effectiveEntry(node.id) !== undefined || buildQuizChoices(node) === null;
               return (
                 <div key={node.id} className="w-full">
                   <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
@@ -107,7 +108,10 @@ export function StepProposal({
                       )}
                       aria-hidden={!revealed}
                     >
-                      <p className="text-sm font-medium">{node.label}</p>
+                      <p className="flex items-center gap-1.5 text-sm font-medium">
+                        <TechIcon name={node.label} size={16} />
+                        {node.label}
+                      </p>
                       <p className="text-xs text-muted-foreground">{node.description}</p>
                     </div>
                   </div>
