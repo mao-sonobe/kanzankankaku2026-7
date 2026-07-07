@@ -1,17 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { CATEGORY_COLORS } from "@/lib/domain/stack-colors";
 import type { TechStackProposal } from "@/lib/domain/stack";
-import { orderPipeline } from "@/lib/domain/stack-pipeline";
 import { buildQuizChoices, getQuizEntry, isQuizComplete } from "@/lib/domain/stack-quiz";
 import { useProjectStore } from "@/lib/store/project-store";
-import { TechIcon } from "@/components/ui/tech-icon";
 import { StackQuizCard } from "./stack-quiz-card";
-import { cn } from "@/lib/utils";
+import { StackDiagram } from "./stack-diagram";
 
 export function StepProposal({
   proposal,
@@ -34,7 +31,6 @@ export function StepProposal({
   const skipQuiz = useProjectStore((s) => s.skipQuiz);
 
   const [feedback, setFeedback] = useState("");
-  const pipeline = useMemo(() => orderPipeline(proposal), [proposal]);
 
   const quizComplete = isQuizComplete(proposal, stackQuiz, stackQuizSkipped);
   const quizNodes = proposal.nodes.filter((n) => buildQuizChoices(n) !== null);
@@ -93,33 +89,16 @@ export function StepProposal({
         </div>
 
         <div className="rounded-2xl border-2 p-4" style={{ borderColor: "var(--brand-blue)" }}>
-          <p className="mb-3 text-xs font-medium text-muted-foreground">パイプライン</p>
-          <div className="flex flex-col items-start gap-1">
-            {pipeline.map((node, i) => {
-              const revealed = effectiveEntry(node.id) !== undefined || buildQuizChoices(node) === null;
+          <p className="mb-3 text-xs font-medium text-muted-foreground">構成図(データの流れ)</p>
+          <StackDiagram
+            proposal={proposal}
+            isRevealed={(nodeId) => {
+              const node = proposal.nodes.find((n) => n.id === nodeId);
               return (
-                <div key={node.id} className="w-full">
-                  <div className="flex items-center gap-2 rounded-lg border bg-muted/40 px-3 py-2">
-                    <span className={cn("size-2 rounded-full", CATEGORY_COLORS[node.category].dot)} />
-                    <div
-                      className={cn(
-                        "transition-[filter] duration-500",
-                        !revealed && "select-none blur-sm"
-                      )}
-                      aria-hidden={!revealed}
-                    >
-                      <p className="flex items-center gap-1.5 text-sm font-medium">
-                        <TechIcon name={node.label} size={16} />
-                        {node.label}
-                      </p>
-                      <p className="text-xs text-muted-foreground">{node.description}</p>
-                    </div>
-                  </div>
-                  {i < pipeline.length - 1 && <div className="ml-4 h-4 border-l-2 border-dashed" />}
-                </div>
+                effectiveEntry(nodeId) !== undefined || (node ? buildQuizChoices(node) === null : true)
               );
-            })}
-          </div>
+            }}
+          />
         </div>
       </div>
 

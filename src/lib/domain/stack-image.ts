@@ -1,24 +1,25 @@
 // 技術スタックのまとめ画像(PNG)をCanvasで生成する。STEP4のダウンロードボタンから使う。
+// 画面表示のStackDiagram(アーキテクチャ図)と同じレイアウトで、
+// アイコン入りボックス+データの流れを書いた矢印を描く。
 // アイコンはdevicon(CORS許可あり)から取得し、失敗した技術は頭文字の丸で描く。
 
 import type { StackCategory, TechStackProposal } from "./stack";
 import { STACK_CATEGORY_LABEL } from "./stack";
-import { orderPipeline } from "./stack-pipeline";
+import { DIAGRAM_NODE_H, DIAGRAM_NODE_W, layoutStackDiagram } from "./stack-layout";
 import { techIconUrl } from "./tech-icon";
 
-const CATEGORY_HEX: Record<StackCategory, { bg: string; dot: string; text: string }> = {
-  frontend: { bg: "#eff6ff", dot: "#3b82f6", text: "#1e3a8a" },
-  backend: { bg: "#ecfdf5", dot: "#10b981", text: "#064e3b" },
-  infra: { bg: "#fffbeb", dot: "#f59e0b", text: "#78350f" },
-  data: { bg: "#f5f3ff", dot: "#8b5cf6", text: "#4c1d95" },
-  other: { bg: "#f8fafc", dot: "#64748b", text: "#0f172a" },
+const CATEGORY_HEX: Record<StackCategory, { fill: string; stroke: string; text: string }> = {
+  frontend: { fill: "#eff6ff", stroke: "#60a5fa", text: "#1e3a8a" },
+  backend: { fill: "#ecfdf5", stroke: "#34d399", text: "#064e3b" },
+  infra: { fill: "#fffbeb", stroke: "#fbbf24", text: "#78350f" },
+  data: { fill: "#f5f3ff", stroke: "#a78bfa", text: "#4c1d95" },
+  other: { fill: "#f8fafc", stroke: "#94a3b8", text: "#0f172a" },
 };
 
-const W = 1200;
-const PAD = 48;
-const COL_GAP = 24;
-const CARD_W = (W - PAD * 2 - COL_GAP) / 2;
 const FONT = "'Hiragino Sans', 'Noto Sans JP', sans-serif";
+const SCALE = 2; // 高解像度で書き出す
+const HEADER_H = 92;
+const PAD_X = 24;
 
 function loadIcon(label: string): Promise<HTMLImageElement | null> {
   const url = techIconUrl(label);
@@ -30,21 +31,6 @@ function loadIcon(label: string): Promise<HTMLImageElement | null> {
     img.onerror = () => resolve(null);
     img.src = url;
   });
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  const lines: string[] = [];
-  let current = "";
-  for (const ch of text) {
-    if (ch === "\n" || ctx.measureText(current + ch).width > maxWidth) {
-      lines.push(current);
-      current = ch === "\n" ? "" : ch;
-    } else {
-      current += ch;
-    }
-  }
-  if (current) lines.push(current);
-  return lines;
 }
 
 function drawIcon(
@@ -89,7 +75,21 @@ function roundRect(
   ctx.closePath();
 }
 
-/** 技術スタックのまとめ画像(PNG Blob)を生成する。 */
+function drawArrowHead(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  angle: number
+) {
+  const len = 9;
+  ctx.beginPath();
+  ctx.moveTo(x - len * Math.cos(angle - Math.PI / 6), y - len * Math.sin(angle - Math.PI / 6));
+  ctx.lineTo(x, y);
+  ctx.lineTo(x - len * Math.cos(angle + Math.PI / 6), y - len * Math.sin(angle + Math.PI / 6));
+  ctx.stroke();
+}
+
+/** 技術スタックのまとめ画像(PNG Blob)を、画面と同じアーキテクチャ図スタイルで生成する。 */
 export async function buildStackSummaryPng(proposal: TechStackProposal): Promise<Blob> {
   const icons = new Map<string, HTMLImageElement | null>();
   await Promise.all(
@@ -98,126 +98,94 @@ export async function buildStackSummaryPng(proposal: TechStackProposal): Promise
     })
   );
 
-  // 高さを事前計算するため測定用コンテキストを使う。
-  const measure = document.createElement("canvas").getContext("2d")!;
-  measure.font = `13px ${FONT}`;
-  const descWidth = CARD_W - 32;
-  const cards = proposal.nodes.map((n) => {
-    const lines = wrapText(measure, n.description, descWidth);
-    return { node: n, lines, height: 16 + 22 + 8 + 28 + 6 + lines.length * 20 + 16 };
-  });
-
-  // 2カラムに詰める(左右交互ではなく高さの低い方へ)。
-  const colY = [0, 0];
-  const placed = cards.map((c) => {
-    const col = colY[0] <= colY[1] ? 0 : 1;
-    const pos = { ...c, col, y: colY[col] };
-    colY[col] += c.height + 16;
-    return pos;
-  });
-  const cardsHeight = Math.max(colY[0], colY[1]);
-
-  const pipeline = orderPipeline(proposal);
-  const headerH = 96;
-  const pipelineH = 40 + 72;
-  const H = PAD + headerH + cardsHeight + pipelineH + PAD;
+  const layout = layoutStackDiagram(proposal);
+  const width = Math.max(layout.width + PAD_X * 2, 640);
+  const height = HEADER_H + layout.height + 24;
 
   const canvas = document.createElement("canvas");
-  canvas.width = W;
-  canvas.height = H;
+  canvas.width = width * SCALE;
+  canvas.height = height * SCALE;
   const ctx = canvas.getContext("2d")!;
+  ctx.scale(SCALE, SCALE);
 
   // 背景
   ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, W, H);
+  ctx.fillRect(0, 0, width, height);
 
   // ヘッダー
-  const grad = ctx.createLinearGradient(PAD, 0, W - PAD, 0);
+  const grad = ctx.createLinearGradient(PAD_X, 0, width - PAD_X, 0);
   grad.addColorStop(0, "#3b82f6");
   grad.addColorStop(1, "#ec4899");
   ctx.fillStyle = grad;
-  ctx.fillRect(PAD, PAD, 56, 6);
+  ctx.fillRect(PAD_X, 28, 56, 6);
   ctx.fillStyle = "#0f172a";
-  ctx.font = `bold 30px ${FONT}`;
+  ctx.font = `bold 26px ${FONT}`;
   ctx.textAlign = "left";
   ctx.textBaseline = "alphabetic";
-  ctx.fillText("技術スタックまとめ", PAD, PAD + 48);
+  ctx.fillText("技術スタック構成図", PAD_X, 66);
   ctx.fillStyle = "#64748b";
-  ctx.font = `14px ${FONT}`;
-  ctx.fillText("Out↓In — アウトプットがインプットになる開発学習アプリ", PAD, PAD + 74);
+  ctx.font = `13px ${FONT}`;
+  ctx.fillText("Out↓In — アウトプットがインプットになる開発学習アプリ", PAD_X + 240, 66);
 
-  // ノードカード
-  const cardsTop = PAD + headerH;
-  for (const c of placed) {
-    const x = PAD + c.col * (CARD_W + COL_GAP);
-    const y = cardsTop + c.y;
-    const colors = CATEGORY_HEX[c.node.category];
-    ctx.fillStyle = colors.bg;
-    roundRect(ctx, x, y, CARD_W, c.height, 12);
-    ctx.fill();
-    ctx.strokeStyle = "#e2e8f0";
-    ctx.lineWidth = 1;
-    ctx.stroke();
+  ctx.save();
+  ctx.translate(PAD_X, HEADER_H);
 
-    // カテゴリ行
-    ctx.fillStyle = colors.dot;
-    ctx.beginPath();
-    ctx.arc(x + 16 + 4, y + 16 + 8, 4, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = colors.text;
-    ctx.font = `12px ${FONT}`;
-    ctx.fillText(STACK_CATEGORY_LABEL[c.node.category], x + 16 + 14, y + 16 + 12);
-
-    // 技術名 + アイコン
-    const nameY = y + 16 + 22 + 8;
-    drawIcon(ctx, icons.get(c.node.label) ?? null, c.node.label, x + 16, nameY, 24);
-    ctx.fillStyle = "#0f172a";
-    ctx.font = `bold 18px ${FONT}`;
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(c.node.label, x + 16 + 32, nameY + 18);
-
-    // 説明
-    ctx.fillStyle = "#475569";
-    ctx.font = `13px ${FONT}`;
-    c.lines.forEach((line, i) => {
-      ctx.fillText(line, x + 16, nameY + 28 + 6 + 14 + i * 20);
-    });
-  }
-
-  // パイプライン
-  const pipeTop = cardsTop + cardsHeight + 40;
-  ctx.fillStyle = "#64748b";
-  ctx.font = `bold 13px ${FONT}`;
-  ctx.fillText("パイプライン(データの流れ)", PAD, pipeTop);
-  let px = PAD;
-  const pillY = pipeTop + 16;
-  ctx.font = `bold 14px ${FONT}`;
-  for (let i = 0; i < pipeline.length; i++) {
-    const n = pipeline[i];
-    const textW = ctx.measureText(n.label).width;
-    const pillW = 12 + 20 + 6 + textW + 12;
-    const colors = CATEGORY_HEX[n.category];
-    ctx.fillStyle = "#f8fafc";
-    roundRect(ctx, px, pillY, pillW, 40, 20);
-    ctx.fill();
-    ctx.strokeStyle = colors.dot;
+  // 矢印(エッジ)
+  for (const e of layout.edges) {
+    ctx.strokeStyle = "#94a3b8";
     ctx.lineWidth = 1.5;
-    ctx.stroke();
-    drawIcon(ctx, icons.get(n.label) ?? null, n.label, px + 12, pillY + 10, 20);
-    ctx.fillStyle = "#0f172a";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(n.label, px + 12 + 26, pillY + 26);
-    px += pillW;
-    if (i < pipeline.length - 1) {
-      ctx.fillStyle = "#94a3b8";
-      ctx.fillText("→", px + 8, pillY + 26);
-      px += 30;
+    if (e.path) {
+      ctx.stroke(new Path2D(e.path));
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(e.x1, e.y1);
+      ctx.lineTo(e.x2, e.y2);
+      ctx.stroke();
+    }
+    drawArrowHead(ctx, e.x2, e.y2, e.endAngle);
+
+    if (e.edge.label) {
+      ctx.font = `11px ${FONT}`;
+      const w = ctx.measureText(e.edge.label).width;
+      const startAnchored = Boolean(e.path);
+      const boxX = startAnchored ? e.labelX - 4 : e.labelX - w / 2 - 4;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(boxX, e.labelY - 11, w + 8, 15);
+      ctx.fillStyle = "#475569";
+      ctx.textAlign = startAnchored ? "left" : "center";
+      ctx.fillText(e.edge.label, e.labelX, e.labelY);
+      ctx.textAlign = "left";
     }
   }
 
+  // ノード
+  for (const { node, x, y } of layout.nodes) {
+    const colors = CATEGORY_HEX[node.category];
+    ctx.fillStyle = colors.fill;
+    roundRect(ctx, x, y, DIAGRAM_NODE_W, DIAGRAM_NODE_H, 10);
+    ctx.fill();
+    ctx.strokeStyle = colors.stroke;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    const icon = icons.get(node.label) ?? null;
+    drawIcon(ctx, icon, node.label, x + 12, y + DIAGRAM_NODE_H / 2 - 13, 26);
+    ctx.fillStyle = "#0f172a";
+    ctx.font = `bold 14px ${FONT}`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(node.label, x + 46, y + DIAGRAM_NODE_H / 2 - 3);
+    ctx.fillStyle = colors.text;
+    ctx.font = `10.5px ${FONT}`;
+    ctx.fillText(STACK_CATEGORY_LABEL[node.category], x + 46, y + DIAGRAM_NODE_H / 2 + 15);
+  }
+
+  ctx.restore();
+
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error("画像の生成に失敗しました"))), "image/png");
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("画像の生成に失敗しました"))),
+      "image/png"
+    );
   });
 }

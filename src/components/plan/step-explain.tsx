@@ -7,6 +7,7 @@ import { CATEGORY_COLORS } from "@/lib/domain/stack-colors";
 import { STACK_CATEGORY_LABEL, type StackCategory, type TechStackProposal } from "@/lib/domain/stack";
 import { buildStackSummaryPng } from "@/lib/domain/stack-image";
 import { TechIcon } from "@/components/ui/tech-icon";
+import { StackDiagram } from "./stack-diagram";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ORDER: StackCategory[] = ["frontend", "backend", "data", "infra", "other"];
@@ -58,6 +59,11 @@ export function StepExplain({
           </Button>
           {exportError && <p className="text-xs text-destructive">{exportError}</p>}
         </div>
+      </div>
+
+      <div className="rounded-2xl border-2 p-4" style={{ borderColor: "var(--brand-pink)" }}>
+        <p className="mb-3 text-xs font-medium text-muted-foreground">構成図(データの流れ)</p>
+        <StackDiagram proposal={proposal} />
       </div>
 
       <div className="flex flex-wrap gap-2">

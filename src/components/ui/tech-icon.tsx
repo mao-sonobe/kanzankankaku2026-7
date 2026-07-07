@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { techIconUrl } from "@/lib/domain/tech-icon";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +18,26 @@ export function TechIcon({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
   const url = techIconUrl(name);
+
+  // SSR/ハイドレーションのタイミングでonErrorを取り逃がしても失敗を検知できるよう、
+  // マウント後に読み込み状態を直接確認し、ネイティブイベントでも監視する。
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el) return;
+    const markFailed = () => setFailed(true);
+    const check = () => {
+      if (el.complete && el.naturalWidth === 0) markFailed();
+    };
+    check();
+    el.addEventListener("error", markFailed);
+    el.addEventListener("load", check);
+    return () => {
+      el.removeEventListener("error", markFailed);
+      el.removeEventListener("load", check);
+    };
+  }, [url]);
 
   if (!url || failed) {
     return (
@@ -39,12 +58,12 @@ export function TechIcon({
     // 外部SVG(devicon)を表示するだけなのでnext/imageの最適化は不要。
     // eslint-disable-next-line @next/next/no-img-element
     <img
+      ref={imgRef}
       src={url}
       alt=""
       aria-hidden
       width={size}
       height={size}
-      loading="lazy"
       className={cn("inline-block flex-none", className)}
       onError={() => setFailed(true)}
     />

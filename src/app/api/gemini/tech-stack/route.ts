@@ -56,10 +56,14 @@ const techStackSchema = z.object({
         id: z.string(),
         source: z.string().describe("nodesのid"),
         target: z.string().describe("nodesのid"),
-        label: z.string().optional(),
+        label: z
+          .string()
+          .describe(
+            "この2つの技術間で実際に受け渡されるデータの短い説明(5〜12文字。例: 検索リクエスト、SQLクエリ結果、認証トークン)"
+          ),
       })
     )
-    .describe("ノード間の関係(例: フロントエンドがバックエンドAPIを呼ぶ)"),
+    .describe("ノード間のデータの流れ(例: フロントエンドがバックエンドAPIを呼ぶ)"),
 });
 
 export async function POST(req: NextRequest) {
@@ -95,6 +99,8 @@ export async function POST(req: NextRequest) {
         "label自体や他ノードのlabelと重複させないでください。" +
         "各誤答のreasonには「その技術も実在の選択肢だが、今回の企画には最適でない理由」を" +
         "初心者に分かる1文で書いてください(技術をけなすのではなく、企画との相性で説明する)。\n" +
+        "- 各エッジのlabelには「その2つの技術間で実際に何のデータが渡るか」を5〜12文字で必ず書いてください" +
+        "(例: 検索リクエスト、書籍データJSON、SQLクエリ結果、認証トークン)。「関係がある」のような曖昧な表現は禁止です。\n" +
         "- ノード数は3〜8個程度、フレーズ数は3〜8個程度に抑えてください。" +
         (isRegeneration
           ? "\n\n【再生成モード】現在の提案(JSON)とユーザーの変更要望が与えられます。" +
