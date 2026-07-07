@@ -5,6 +5,7 @@ import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { EditorView, Decoration, WidgetType, type DecorationSet } from "@codemirror/view";
 import type { BlockRole, ChunkedFile } from "@/lib/ai/types";
+import type { StackCategory, TechStackNode } from "@/lib/domain/stack";
 import { buildFileContentWithRanges, type SlotRange } from "@/lib/domain/chunk-code";
 import { BLOCK_ROLE_LABEL } from "@/lib/domain/block-colors";
 
@@ -21,17 +22,31 @@ const ROLE_HEX: Record<BlockRole, { bg: string; border: string }> = {
   other: { bg: "#f3f4f6", border: "#9ca3af" },
 };
 
+// stack-colors.tsのTailwindカラー(100/400/900)に対応する実色値。データフロー解説でも使う。
+export const CATEGORY_HEX: Record<StackCategory, { bg: string; border: string; text: string }> = {
+  frontend: { bg: "#dbeafe", border: "#60a5fa", text: "#1e3a8a" },
+  backend: { bg: "#d1fae5", border: "#34d399", text: "#064e3b" },
+  infra: { bg: "#fef3c7", border: "#fbbf24", text: "#78350f" },
+  data: { bg: "#ede9fe", border: "#a78bfa", text: "#4c1d95" },
+  other: { bg: "#f1f5f9", border: "#94a3b8", text: "#0f172a" },
+};
+
 class SlotWidget extends WidgetType {
   constructor(
     private readonly range: SlotRange,
     private readonly isActive: boolean,
-    private readonly onClick: (slotId: string) => void
+    private readonly onClick: (slotId: string) => void,
+    private readonly relatedNode: TechStackNode | null
   ) {
     super();
   }
 
   eq(other: SlotWidget) {
-    return other.range.slot.id === this.range.slot.id && other.isActive === this.isActive;
+    return (
+      other.range.slot.id === this.range.slot.id &&
+      other.isActive === this.isActive &&
+      other.relatedNode?.id === this.relatedNode?.id
+    );
   }
 
   toDOM() {
@@ -43,6 +58,17 @@ class SlotWidget extends WidgetType {
     label.className = "cm-slot-label";
     label.textContent = BLOCK_ROLE_LABEL[this.range.slot.role];
     el.appendChild(label);
+
+    if (this.relatedNode) {
+      const tech = document.createElement("span");
+      tech.className = "cm-slot-tech";
+      tech.textContent = this.relatedNode.label;
+      const hex = CATEGORY_HEX[this.relatedNode.category];
+      tech.style.backgroundColor = hex.bg;
+      tech.style.border = `1px solid ${hex.border}`;
+      tech.style.color = hex.text;
+      el.appendChild(tech);
+    }
 
     const correctChoice = this.range.slot.choices.find((c) => c.isCorrect);
     if (correctChoice) {
@@ -69,7 +95,8 @@ class SlotWidget extends WidgetType {
 function buildDecorations(
   ranges: SlotRange[],
   activeSlotId: string | null,
-  onSlotClick: (slotId: string) => void
+  onSlotClick: (slotId: string) => void,
+  nodeById: Map<string, TechStackNode> | undefined
 ): DecorationSet {
   const decos = ranges.map((r) => {
     if (r.choice) {
@@ -78,8 +105,10 @@ function buildDecorations(
         attributes: { "data-slot-id": r.slot.id },
       }).range(r.start, r.end);
     }
+    const relatedNode =
+      (r.slot.relatedStackNodeId && nodeById?.get(r.slot.relatedStackNodeId)) || null;
     return Decoration.replace({
-      widget: new SlotWidget(r, activeSlotId === r.slot.id, onSlotClick),
+      widget: new SlotWidget(r, activeSlotId === r.slot.id, onSlotClick, relatedNode),
     }).range(r.start, r.end);
   });
   return Decoration.set(decos, true);
@@ -90,11 +119,14 @@ export function CodeEditor({
   answers,
   activeSlotId,
   onSlotClick,
+  nodeById,
 }: {
   chunked: ChunkedFile;
   answers: Record<string, string>;
   activeSlotId: string | null;
   onSlotClick: (slotId: string) => void;
+  /** 技術スタックノードの参照(空欄→技術チップ表示用)。任意 */
+  nodeById?: Map<string, TechStackNode>;
 }) {
   const { text, ranges } = useMemo(
     () => buildFileContentWithRanges(chunked, answers),
@@ -102,7 +134,7 @@ export function CodeEditor({
   );
 
   const extensions = useMemo(() => {
-    const decorations = buildDecorations(ranges, activeSlotId, onSlotClick);
+    const decorations = buildDecorations(ranges, activeSlotId, onSlotClick, nodeById);
     return [
       javascript({ jsx: true }),
       EditorView.editable.of(false),
@@ -143,6 +175,13 @@ export function CodeEditor({
           opacity: "0.35",
           fontStyle: "italic",
         },
+        ".cm-slot-tech": {
+          fontSize: "10px",
+          fontStyle: "normal",
+          borderRadius: "9999px",
+          padding: "0 5px",
+          whiteSpace: "nowrap",
+        },
         ".cm-slot-filled": {
           borderRadius: "4px",
           padding: "0 2px",
@@ -160,7 +199,7 @@ export function CodeEditor({
       }),
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ranges, activeSlotId]);
+  }, [ranges, activeSlotId, nodeById]);
 
   return (
     <CodeMirror

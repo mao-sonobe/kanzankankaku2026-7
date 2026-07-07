@@ -2,10 +2,14 @@ import type { AIProviderSettings } from "./types";
 
 const STORAGE_KEY = "ai-provider-settings";
 
+// Web公開版はGeminiが前提(Ollamaはlocalhost必須のため開発者向けオプション)。
 export const DEFAULT_AI_SETTINGS: AIProviderSettings = {
+  provider: "gemini",
   endpoint: "http://localhost:11434",
-  model: "qwen2.5:3b",
+  model: "gemini-2.5-flash",
 };
+
+export const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";
 
 export function loadAISettings(): AIProviderSettings {
   if (typeof window === "undefined") return DEFAULT_AI_SETTINGS;
@@ -14,6 +18,7 @@ export function loadAISettings(): AIProviderSettings {
     if (!raw) return DEFAULT_AI_SETTINGS;
     const parsed = JSON.parse(raw);
     return {
+      provider: parsed.provider === "gemini" ? "gemini" : "ollama",
       endpoint: parsed.endpoint || DEFAULT_AI_SETTINGS.endpoint,
       model: parsed.model || DEFAULT_AI_SETTINGS.model,
     };

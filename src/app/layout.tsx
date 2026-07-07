@@ -17,6 +17,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "アウトプットがインプットになる開発学習アプリ",
   description: "企画書からコード生成、そしてブロック穴埋めでコードを理解する開発学習ツール",
+  icons: {
+    icon: "/logo-icon.png",
+    apple: "/logo-icon.png",
+  },
 };
 
 export default function RootLayout({

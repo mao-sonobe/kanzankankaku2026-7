@@ -2,6 +2,7 @@
 // このインターフェースにのみ依存し、具体的なプロバイダー実装（Ollama/将来のGemini等）を意識しない。
 
 import type { TechStackProposal } from "@/lib/domain/stack";
+import type { DataFlowResult } from "@/lib/domain/data-flow";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -17,6 +18,10 @@ export interface ProposeTechStackOptions {
   planText: string;
   /** これまでの対話履歴（企画の深掘り質問と回答） */
   chatHistory: ChatMessage[];
+  /** 直前の提案(再生成時のベース)。指定時はfeedbackで要求された部分だけを変更する */
+  currentProposal?: TechStackProposal;
+  /** 「ここだけ変更してほしい」というユーザーからの要望テキスト */
+  feedback?: string;
   signal?: AbortSignal;
 }
 
@@ -58,6 +63,8 @@ export interface CodeBlockSlot {
   role: BlockRole;
   label: string;
   choices: CodeBlockChoice[];
+  /** この空欄が関わる技術スタックノードのid(STEP3の提案との紐付け。任意) */
+  relatedStackNodeId?: string;
 }
 
 /** チャンク化されたファイル: ゴーストコード + 空欄スロットの並び */
@@ -72,11 +79,19 @@ export interface ChunkedFile {
 
 export interface ChunkCodeOptions {
   file: GeneratedFile;
+  /** 指定時、空欄を技術間のデータ受け渡し箇所に寄せ、relatedStackNodeIdを付与する */
+  stackProposal?: TechStackProposal;
   signal?: AbortSignal;
 }
 
 export interface ChunkCodeResult {
   chunked: ChunkedFile;
+}
+
+export interface AnalyzeDataFlowOptions {
+  files: GeneratedFile[];
+  stackProposal: TechStackProposal;
+  signal?: AbortSignal;
 }
 
 /**
@@ -91,11 +106,20 @@ export interface AIProvider {
   proposeTechStack(options: ProposeTechStackOptions): Promise<TechStackProposal>;
   generateCode(options: GenerateCodeOptions): Promise<GenerateCodeResult>;
   chunkCode(options: ChunkCodeOptions): Promise<ChunkCodeResult>;
+  /**
+   * 生成コード内で技術スタックのエッジ(データの流れ)が実装されている箇所を特定する。
+   * 未対応のプロバイダー(Ollama)は実装しなくてよく、UI側はその場合機能を隠す。
+   */
+  analyzeDataFlow?(options: AnalyzeDataFlowOptions): Promise<DataFlowResult>;
   /** 疎通確認。利用可能なモデル一覧を返す */
   checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }>;
 }
 
+export type AIProviderKind = "ollama" | "gemini";
+
 export interface AIProviderSettings {
+  provider: AIProviderKind;
+  /** Ollama使用時のみ参照するエンドポイントURL */
   endpoint: string;
   model: string;
 }

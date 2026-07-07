@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { DEFAULT_AI_SETTINGS, loadAISettings, saveAISettings } from "@/lib/ai/settings";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DEFAULT_AI_SETTINGS, GEMINI_DEFAULT_MODEL, loadAISettings, saveAISettings } from "@/lib/ai/settings";
+import type { AIProviderKind } from "@/lib/ai/types";
 import { useProjectStore } from "@/lib/store/project-store";
 
 type ConnectionState =
@@ -17,6 +19,7 @@ type ConnectionState =
   | { status: "error"; message: string };
 
 export default function SettingsPage() {
+  const [provider, setProvider] = useState<AIProviderKind>(DEFAULT_AI_SETTINGS.provider);
   const [endpoint, setEndpoint] = useState(DEFAULT_AI_SETTINGS.endpoint);
   const [model, setModel] = useState(DEFAULT_AI_SETTINGS.model);
   const [conn, setConn] = useState<ConnectionState>({ status: "idle" });
@@ -27,21 +30,32 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const settings = loadAISettings();
+    setProvider(settings.provider);
     setEndpoint(settings.endpoint);
     setModel(settings.model);
   }, []);
 
+  function handleProviderChange(next: AIProviderKind) {
+    setProvider(next);
+    setConn({ status: "idle" });
+    // プロバイダー切り替え時、モデル名が切り替え前のデフォルトのままなら
+    // 新しいプロバイダーの適切なデフォルトに合わせる。
+    if (model === DEFAULT_AI_SETTINGS.model || model === GEMINI_DEFAULT_MODEL) {
+      setModel(next === "gemini" ? GEMINI_DEFAULT_MODEL : DEFAULT_AI_SETTINGS.model);
+    }
+  }
+
   function handleSave() {
-    saveAISettings({ endpoint, model });
+    saveAISettings({ provider, endpoint, model });
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
 
   async function handleCheckConnection() {
     setConn({ status: "checking" });
-    saveAISettings({ endpoint, model });
+    saveAISettings({ provider, endpoint, model });
     try {
-      const res = await fetch("/api/ollama/tags", {
+      const res = await fetch(provider === "gemini" ? "/api/gemini/check" : "/api/ollama/tags", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint }),
@@ -67,33 +81,48 @@ export default function SettingsPage() {
     <div className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
       <h1 className="text-2xl font-bold tracking-tight">AIプロバイダー設定</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        このアプリはローカルで動作するOllamaを利用します。事前に <code>ollama serve</code>{" "}
-        を起動し、使用したいモデルを <code>ollama pull</code> 済みにしておいてください。
-        APIキーは不要です。
+        {provider === "gemini"
+          ? "Gemini(Google Generative AI)を使用します。APIキーはサーバー側の.env.localに設定してください(このAPIキーはブラウザには渡りません)。"
+          : <>
+              このアプリはローカルで動作するOllamaを利用します。事前に <code>ollama serve</code>{" "}
+              を起動し、使用したいモデルを <code>ollama pull</code> 済みにしておいてください。
+              APIキーは不要です。
+            </>}
       </p>
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>Ollama接続設定</CardTitle>
-          <CardDescription>エンドポイントURLとモデル名を入力してください。</CardDescription>
+          <CardTitle>接続設定</CardTitle>
+          <CardDescription>使用するAIプロバイダーとモデル名を選んでください。</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="endpoint">エンドポイントURL</Label>
-            <Input
-              id="endpoint"
-              value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
-              placeholder="http://localhost:11434"
-            />
+            <Label>プロバイダー</Label>
+            <Tabs value={provider} onValueChange={(v) => handleProviderChange(v as AIProviderKind)}>
+              <TabsList>
+                <TabsTrigger value="ollama">Ollama(ローカル)</TabsTrigger>
+                <TabsTrigger value="gemini">Gemini(実験)</TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
+          {provider === "ollama" && (
+            <div className="space-y-2">
+              <Label htmlFor="endpoint">エンドポイントURL</Label>
+              <Input
+                id="endpoint"
+                value={endpoint}
+                onChange={(e) => setEndpoint(e.target.value)}
+                placeholder="http://localhost:11434"
+              />
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="model">モデル名</Label>
             <Input
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder="qwen2.5:3b"
+              placeholder={provider === "gemini" ? GEMINI_DEFAULT_MODEL : "qwen2.5:3b"}
             />
           </div>
 
@@ -114,7 +143,10 @@ export default function SettingsPage() {
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {conn.models.length === 0 && (
                     <span className="text-sm">
-                      モデルが1つも見つかりませんでした。`ollama pull {model}` を実行してください。
+                      モデルが1つも見つかりませんでした。
+                      {provider === "gemini"
+                        ? "APIキーの権限を確認してください。"
+                        : `\`ollama pull ${model}\` を実行してください。`}
                     </span>
                   )}
                   {conn.models.map((m) => (
@@ -125,8 +157,7 @@ export default function SettingsPage() {
                 </div>
                 {!modelAvailable && conn.models.length > 0 && (
                   <p className="mt-2 text-sm text-destructive">
-                    指定したモデル「{model}」が見つかりません。上記のいずれかを指定するか、
-                    `ollama pull {model}` を実行してください。
+                    指定したモデル「{model}」が見つかりません。上記のいずれかを指定してください。
                   </p>
                 )}
               </AlertDescription>

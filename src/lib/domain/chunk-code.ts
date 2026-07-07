@@ -6,6 +6,8 @@ export interface RawBlank {
   role: BlockRole;
   label: string;
   wrongAnswers: string[];
+  /** この空欄が関わる技術スタックノードのid(任意) */
+  relatedStackNodeId?: string;
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -22,7 +24,12 @@ function shuffle<T>(items: T[]): T[] {
  * text/slotのセグメント列を構築する。「text」部分は元コードの厳密なスライスなので、
  * 全スロットに正解を入れれば元のコードと完全に一致することが保証される。
  */
-export function buildChunkedFile(path: string, content: string, blanks: RawBlank[]): ChunkedFile {
+export function buildChunkedFile(
+  path: string,
+  content: string,
+  blanks: RawBlank[],
+  validNodeIds?: Set<string>
+): ChunkedFile {
   // CodeMirrorのウィジェット描画を単純にするため、複数行にまたがる空欄は除外する。
   const accepted = locateNonOverlapping(content, blanks, (b) => b.text).filter(
     (m) => !content.slice(m.start, m.end).includes("\n")
@@ -48,11 +55,16 @@ export function buildChunkedFile(path: string, content: string, blanks: RawBlank
           isCorrect: false,
         })),
     ]);
+    const relatedStackNodeId =
+      m.item.relatedStackNodeId && validNodeIds?.has(m.item.relatedStackNodeId)
+        ? m.item.relatedStackNodeId
+        : undefined;
     const slot: CodeBlockSlot = {
       id: `slot-${slotIndex}`,
       role: m.item.role,
       label: m.item.label,
       choices,
+      ...(relatedStackNodeId ? { relatedStackNodeId } : {}),
     };
     segments.push({ type: "slot", slot });
     cursor = m.end;

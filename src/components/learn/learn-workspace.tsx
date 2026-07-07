@@ -10,10 +10,12 @@ import { useProjectStore } from "@/lib/store/project-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
 import { getExecutionProvider } from "@/lib/execution/webcontainer-provider";
 import { buildFileContent } from "@/lib/domain/chunk-code";
+import { SCAFFOLD_PATHS } from "@/lib/generated-app/scaffold";
 import { CodeEditor } from "./code-editor";
-import { BlockPalette } from "./block-palette";
+import { BlockPalette, type RelatedNodeInfo } from "./block-palette";
+import { DataFlowView } from "./data-flow-view";
 
-const SCAFFOLD_PATHS = new Set(["package.json", "next.config.mjs", "app/layout.js", "app/globals.css"]);
+type LearnMode = "flow" | "fill";
 
 export function LearnWorkspace() {
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
@@ -22,17 +24,24 @@ export function LearnWorkspace() {
   const setChunkedFile = useProjectStore((s) => s.setChunkedFile);
   const slotAnswers = useProjectStore((s) => s.slotAnswers);
   const setSlotAnswer = useProjectStore((s) => s.setSlotAnswer);
+  const stackProposal = useProjectStore((s) => s.stackProposal);
 
   const learnableFiles = useMemo(
     () => generatedFiles.filter((f) => !SCAFFOLD_PATHS.has(f.path)),
     [generatedFiles]
   );
 
+  const [mode, setMode] = useState<LearnMode>("flow");
   const [selectedPath, setSelectedPath] = useState<string | null>(learnableFiles[0]?.path ?? null);
   const [activeSlotId, setActiveSlotId] = useState<string | null>(null);
   const [isChunking, setIsChunking] = useState(false);
   const [chunkError, setChunkError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
+
+  const nodeById = useMemo(
+    () => new Map(stackProposal?.nodes.map((n) => [n.id, n]) ?? []),
+    [stackProposal]
+  );
 
   const currentPath = selectedPath ?? learnableFiles[0]?.path ?? null;
   const currentFile = learnableFiles.find((f) => f.path === currentPath) ?? null;
@@ -43,6 +52,19 @@ export function LearnWorkspace() {
     (s) => s.type === "slot" && s.slot.id === activeSlotId
   );
   const activeSlotData = activeSlot?.type === "slot" ? activeSlot.slot : null;
+
+  // アクティブな空欄が技術スタックノードに紐づいている場合、
+  // そのノードが関わるデータの流れ(エッジ)をパレットに表示する。
+  const relatedNodeInfo: RelatedNodeInfo | null = useMemo(() => {
+    const nodeId = activeSlotData?.relatedStackNodeId;
+    const node = nodeId ? nodeById.get(nodeId) : undefined;
+    if (!node || !stackProposal) return null;
+    const edge = stackProposal.edges.find((e) => e.source === node.id || e.target === node.id);
+    const edgeText = edge
+      ? `${nodeById.get(edge.source)?.label ?? edge.source} → ${nodeById.get(edge.target)?.label ?? edge.target}`
+      : undefined;
+    return { node, edgeText };
+  }, [activeSlotData, nodeById, stackProposal]);
 
   const totalSlots = chunked?.segments.filter((s) => s.type === "slot").length ?? 0;
   const correctCount =
@@ -56,7 +78,10 @@ export function LearnWorkspace() {
     setIsChunking(true);
     try {
       const provider = getAIProvider();
-      const result = await provider.chunkCode({ file: currentFile });
+      const result = await provider.chunkCode({
+        file: currentFile,
+        stackProposal: stackProposal ?? undefined,
+      });
       setChunkedFile(currentFile.path, result.chunked);
     } catch (err) {
       setChunkError(err instanceof Error ? err.message : "コードの分解に失敗しました");
@@ -97,6 +122,17 @@ export function LearnWorkspace() {
 
   return (
     <div className="flex flex-col gap-4">
+      <Tabs value={mode} onValueChange={(v) => setMode(v as LearnMode)}>
+        <TabsList>
+          <TabsTrigger value="flow">① データフロー解説</TabsTrigger>
+          <TabsTrigger value="fill">② ブロック穴埋め</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
+      {mode === "flow" && <DataFlowView onProceedToFill={() => setMode("fill")} />}
+
+      {mode === "fill" && (
+        <div className="flex flex-col gap-4">
       {learnableFiles.length > 1 && (
         <Tabs value={currentPath ?? undefined} onValueChange={(v) => setSelectedPath(v)}>
           <TabsList>
@@ -151,6 +187,7 @@ export function LearnWorkspace() {
                 answers={answers}
                 activeSlotId={activeSlotId}
                 onSlotClick={setActiveSlotId}
+                nodeById={nodeById}
               />
               {totalSlots > 0 && correctCount === totalSlots && (
                 <Alert className="mt-3">
@@ -179,6 +216,7 @@ export function LearnWorkspace() {
                   slot={activeSlotData ?? null}
                   selectedChoiceId={activeSlotId ? answers[activeSlotId] : undefined}
                   onChoose={handleChoose}
+                  relatedNodeInfo={relatedNodeInfo}
                 />
               </CardContent>
             </Card>
@@ -205,6 +243,8 @@ export function LearnWorkspace() {
               </CardContent>
             </Card>
           </div>
+        </div>
+      )}
         </div>
       )}
     </div>

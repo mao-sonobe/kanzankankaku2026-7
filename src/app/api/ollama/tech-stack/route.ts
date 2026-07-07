@@ -40,7 +40,7 @@ const techStackSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { endpoint, model, planText, chatHistory } = await req.json();
+  const { endpoint, model, planText, chatHistory, currentProposal, feedback } = await req.json();
 
   const provider = createOpenAICompatible({
     name: "ollama",
@@ -50,6 +50,11 @@ export async function POST(req: NextRequest) {
 
   const historyText = Array.isArray(chatHistory)
     ? chatHistory.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join("\n")
+    : "";
+
+  const isRegeneration = Boolean(feedback && currentProposal);
+  const regenerationContext = isRegeneration
+    ? `\n\n現在の提案(JSON):\n${JSON.stringify(currentProposal)}\n\nユーザーからの変更要望:\n${feedback}`
     : "";
 
   try {
@@ -68,11 +73,16 @@ export async function POST(req: NextRequest) {
             "- 例: 企画書が「複数人でリアルタイムに編集できるようにしたい」を含む場合、phrases.text は\"リアルタイムに編集\"のように本文中の連続した文字列そのものにしてください。\n" +
             "- 各技術ノード(nodes)は、なぜその技術が必要かをdescriptionで説明し、関連するphrasesのidをrelatedPhraseIdsに列挙してください。\n" +
             "- カテゴリは frontend/backend/infra/data/other のいずれかにしてください。\n" +
-            "- ノード数は3〜8個程度、フレーズ数は3〜8個程度に抑えてください。",
+            "- ノード数は3〜8個程度、フレーズ数は3〜8個程度に抑えてください。" +
+            (isRegeneration
+              ? "\n\n【再生成モード】現在の提案(JSON)とユーザーの変更要望が与えられます。" +
+                "変更要望に関係するノード/エッジ**だけ**を変更し、それ以外のnodes/edges/idは現在の提案からそのまま維持してください。" +
+                "既存のidは変更しないこと(新しいノードを追加する場合のみ新しいidを発行してよい)。"
+              : ""),
         },
         {
           role: "user",
-          content: `企画書:\n${planText}\n\n対話履歴:\n${historyText || "(なし)"}`,
+          content: `企画書:\n${planText}\n\n対話履歴:\n${historyText || "(なし)"}${regenerationContext}`,
         },
       ],
     });

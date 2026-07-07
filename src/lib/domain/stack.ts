@@ -24,6 +24,8 @@ export interface TechStackNode {
   category: StackCategory;
   description: string;
   relatedPhraseIds: string[];
+  /** STEP3の4択クイズ用。labelの代替になりそうな、もっともらしいが今回は最適でない技術名。 */
+  wrongAnswers?: string[];
 }
 
 export interface TechStackEdge {

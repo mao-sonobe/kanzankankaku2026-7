@@ -1,5 +1,13 @@
 import type { GeneratedFile } from "@/lib/ai/types";
 
+/** スキャフォールド由来のパス。学習対象(AI生成部分)から除外するために使う。 */
+export const SCAFFOLD_PATHS = new Set([
+  "package.json",
+  "next.config.mjs",
+  "app/layout.js",
+  "app/globals.css",
+]);
+
 /**
  * WebContainersで実行するNext.jsプロジェクトの固定スキャフォールド。
  * ビルド設定やレイアウトなど「毎回同じ内容になるべきファイル」はAI生成せず、
