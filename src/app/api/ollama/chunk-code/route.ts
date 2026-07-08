@@ -27,6 +27,12 @@ const blankSchema = z.object({
     .min(1)
     .max(3)
     .describe("textと同程度の長さの、もっともらしいが誤ったコード片"),
+  relatedStackNodeId: z
+    .string()
+    .optional()
+    .describe(
+      "この空欄が関わる技術スタックノードのid(与えられた一覧から)。データ受け渡しに関わる空欄では必須"
+    ),
 });
 
 const chunkCodeSchema = z.object({
@@ -38,9 +44,25 @@ const chunkCodeSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { endpoint, model, file } = await req.json();
+  const { endpoint, model, file, stackProposal } = await req.json();
   const path: string = file?.path ?? "";
   const content: string = file?.content ?? "";
+
+  const stackNodes: { id: string; label: string; category: string; description: string }[] =
+    Array.isArray(stackProposal?.nodes) ? stackProposal.nodes : [];
+  const stackEdges: { source: string; target: string; label?: string }[] = Array.isArray(
+    stackProposal?.edges
+  )
+    ? stackProposal.edges
+    : [];
+  const stackContext =
+    stackNodes.length > 0
+      ? `\n\n技術スタック(ノード一覧):\n${stackNodes
+          .map((n) => `- id=${n.id} / ${n.label} (${n.category}): ${n.description}`)
+          .join("\n")}\n\nデータの流れ(エッジ一覧):\n${stackEdges
+          .map((e) => `- ${e.source} → ${e.target}${e.label ? `: ${e.label}` : ""}`)
+          .join("\n")}`
+      : "";
 
   const provider = createOpenAICompatible({
     name: "ollama",
@@ -53,6 +75,8 @@ export async function POST(req: NextRequest) {
       model: provider.chatModel(model),
       schema: chunkCodeSchema,
       allowSystemInMessages: true,
+      // Qwen3等の推論モデルはデフォルトで長い思考過程を出力し遅くなるため無効化する。
+      providerOptions: { ollama: { reasoningEffort: "none" } },
       messages: [
         {
           role: "system",
@@ -65,16 +89,26 @@ export async function POST(req: NextRequest) {
             "- 空欄は必ず1行に収まる範囲にする(複数行にまたがる空欄は禁止)。\n" +
             "- roleは state(状態管理)/event-handler(イベントハンドラ)/api-fetch(APIフェッチ)/jsx(見た目)/logic(ロジック)/import(インポート)/style(スタイル)/other のいずれか。\n" +
             "- wrongAnswersには、textと文字数が近い、もっともらしいが動作としては誤ったコード片を1〜3個含める。\n" +
-            "- 空欄同士は重複しないようにする。",
+            "- 空欄同士は重複しないようにする。" +
+            (stackNodes.length > 0
+              ? "\n- 技術スタックが与えられています。空欄は技術間のデータ受け渡しのコア部分" +
+                "(fetch呼び出し、APIレスポンスの処理、propsやstateへの受け渡し)を優先して選び、" +
+                "その空欄が関わる技術のidをrelatedStackNodeIdに設定してください。"
+              : ""),
         },
         {
           role: "user",
-          content: `ファイル: ${path}\n\n\`\`\`\n${content}\n\`\`\`\n\nこのコードの穴埋め学習教材を作成してください。`,
+          content: `ファイル: ${path}\n\n\`\`\`\n${content}\n\`\`\`${stackContext}\n\nこのコードの穴埋め学習教材を作成してください。`,
         },
       ],
     });
 
-    const chunked = buildChunkedFile(path, content, object.blanks);
+    const chunked = buildChunkedFile(
+      path,
+      content,
+      object.blanks,
+      new Set(stackNodes.map((n) => n.id))
+    );
     const slotCount = chunked.segments.filter((s) => s.type === "slot").length;
     if (slotCount === 0) {
       return NextResponse.json(
