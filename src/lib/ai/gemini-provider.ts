@@ -1,5 +1,6 @@
 import type {
   AIProvider,
+  AnalyzeDataFlowOptions,
   ChatOptions,
   ChunkCodeOptions,
   ChunkCodeResult,
@@ -8,24 +9,22 @@ import type {
   ProposeTechStackOptions,
 } from "./types";
 import type { TechStackProposal } from "@/lib/domain/stack";
+import type { DataFlowResult } from "@/lib/domain/data-flow";
 import type { AIProviderSettings } from "./types";
 
 /**
- * ローカルLLM(Ollama)を呼び出すAIProvider実装。
- * Next.jsのRoute Handler(/api/ollama/*)を経由してOllamaにリクエストを転送する。
+ * Gemini(Google Generative AI)を呼び出すAIProvider実装。実験用ブランチ。
+ * OllamaAIProviderと同じNext.jsのRoute Handler(/api/gemini/*)経由の構造を踏襲する。
+ * APIキーはクライアントに渡さず、サーバー側の環境変数からのみ読む。
  */
-export class OllamaAIProvider implements AIProvider {
+export class GeminiAIProvider implements AIProvider {
   constructor(private settings: AIProviderSettings) {}
 
   async chat(options: ChatOptions, onToken: (token: string) => void): Promise<string> {
-    const res = await fetch("/api/ollama/chat", {
+    const res = await fetch("/api/gemini/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        endpoint: this.settings.endpoint,
-        model: this.settings.model,
-        messages: options.messages,
-      }),
+      body: JSON.stringify({ model: this.settings.model, messages: options.messages }),
       signal: options.signal,
     });
 
@@ -45,19 +44,16 @@ export class OllamaAIProvider implements AIProvider {
       onToken(chunk);
     }
     if (!full.trim()) {
-      throw new Error(
-        "Ollamaから応答がありませんでした。`ollama serve`が起動しているか、設定画面でモデル名を確認してください。"
-      );
+      throw new Error("Geminiから応答がありませんでした。APIキーとモデル名を確認してください。");
     }
     return full;
   }
 
   async proposeTechStack(options: ProposeTechStackOptions): Promise<TechStackProposal> {
-    const res = await fetch("/api/ollama/tech-stack", {
+    const res = await fetch("/api/gemini/tech-stack", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        endpoint: this.settings.endpoint,
         model: this.settings.model,
         planText: options.planText,
         chatHistory: options.chatHistory,
@@ -74,11 +70,10 @@ export class OllamaAIProvider implements AIProvider {
   }
 
   async generateCode(options: GenerateCodeOptions): Promise<GenerateCodeResult> {
-    const res = await fetch("/api/ollama/generate-code", {
+    const res = await fetch("/api/gemini/generate-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        endpoint: this.settings.endpoint,
         model: this.settings.model,
         planSummary: options.planSummary,
         stackNodes: options.stackNodes,
@@ -93,11 +88,10 @@ export class OllamaAIProvider implements AIProvider {
   }
 
   async chunkCode(options: ChunkCodeOptions): Promise<ChunkCodeResult> {
-    const res = await fetch("/api/ollama/chunk-code", {
+    const res = await fetch("/api/gemini/chunk-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        endpoint: this.settings.endpoint,
         model: this.settings.model,
         file: options.file,
         stackProposal: options.stackProposal,
@@ -111,12 +105,26 @@ export class OllamaAIProvider implements AIProvider {
     return data.result as ChunkCodeResult;
   }
 
-  async checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }> {
-    const res = await fetch("/api/ollama/tags", {
+  async analyzeDataFlow(options: AnalyzeDataFlowOptions): Promise<DataFlowResult> {
+    const res = await fetch("/api/gemini/data-flow", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: this.settings.endpoint }),
+      body: JSON.stringify({
+        model: this.settings.model,
+        files: options.files,
+        stackProposal: options.stackProposal,
+      }),
+      signal: options.signal,
     });
+    const data = await res.json();
+    if (!data.ok) {
+      throw new Error(data.error ?? "データフローの解析に失敗しました");
+    }
+    return data.result as DataFlowResult;
+  }
+
+  async checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }> {
+    const res = await fetch("/api/gemini/check", { method: "POST" });
     return res.json();
   }
 }

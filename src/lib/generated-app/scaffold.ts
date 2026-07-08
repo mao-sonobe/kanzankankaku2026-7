@@ -1,5 +1,13 @@
 import type { GeneratedFile } from "@/lib/ai/types";
 
+/** スキャフォールド由来のパス。学習対象(AI生成部分)から除外するために使う。 */
+export const SCAFFOLD_PATHS = new Set([
+  "package.json",
+  "next.config.mjs",
+  "app/layout.js",
+  "app/globals.css",
+]);
+
 /**
  * WebContainersで実行するNext.jsプロジェクトの固定スキャフォールド。
  * ビルド設定やレイアウトなど「毎回同じ内容になるべきファイル」はAI生成せず、
@@ -21,7 +29,11 @@ export function getScaffoldFiles(): GeneratedFile[] {
             start: "next start",
           },
           dependencies: {
-            next: "15.5.20",
+            // Next.js 15.5.x はWebContainers上で"Expected workUnitAsyncStorage to have a store"
+            // という内部invariantエラーで/がクラッシュする既知の不具合がある
+            // (https://github.com/vercel/next.js/issues/84026)。
+            // 15.4系(15.4.1で動作確認済み)に固定して回避する。
+            next: "15.4.11",
             react: "19.2.4",
             "react-dom": "19.2.4",
           },

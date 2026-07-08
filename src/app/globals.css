@@ -49,6 +49,9 @@
 }
 
 :root {
+  /* ロゴのブランドカラー: 歯車(作る/アウトプット)=青、脳(理解する/インプット)=赤 */
+  --brand-blue: #4eb6de;
+  --brand-pink: #e2596f;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

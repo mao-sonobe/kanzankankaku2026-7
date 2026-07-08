@@ -16,6 +16,8 @@ export async function POST(req: NextRequest) {
       model: provider.chatModel(model),
       messages,
       allowSystemInMessages: true,
+      // Qwen3等の推論モデルはデフォルトで長い思考過程を出力し遅くなるため無効化する。
+      providerOptions: { ollama: { reasoningEffort: "none" } },
     });
 
     return result.toTextStreamResponse();
