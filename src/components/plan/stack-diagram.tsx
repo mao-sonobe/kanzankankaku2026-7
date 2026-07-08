@@ -19,12 +19,36 @@ import { cn } from "@/lib/utils";
 export function StackDiagram({
   proposal,
   isRevealed,
+  hideUnrevealed = false,
+  highlightNodeId = null,
 }: {
   proposal: TechStackProposal;
   /** 省略時は全ノード開示扱い */
   isRevealed?: (nodeId: string) => boolean;
+  /** trueなら未開示ノードをぼかしではなく非表示にする(回答するたび図が育つ表示用) */
+  hideUnrevealed?: boolean;
+  /** 強調表示するノードid(履歴カードのホバー連動用) */
+  highlightNodeId?: string | null;
 }) {
-  const layout = useMemo(() => layoutStackDiagram(proposal), [proposal]);
+  const layout = useMemo(() => {
+    if (hideUnrevealed && isRevealed) {
+      const visible = new Set(proposal.nodes.filter((n) => isRevealed(n.id)).map((n) => n.id));
+      return layoutStackDiagram({
+        ...proposal,
+        nodes: proposal.nodes.filter((n) => visible.has(n.id)),
+        edges: proposal.edges.filter((e) => visible.has(e.source) && visible.has(e.target)),
+      });
+    }
+    return layoutStackDiagram(proposal);
+  }, [proposal, hideUnrevealed, isRevealed]);
+
+  if (layout.nodes.length === 0) {
+    return (
+      <p className="py-10 text-center text-sm text-muted-foreground">
+        カードに答えると、ここに構成図が育っていきます。
+      </p>
+    );
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -102,15 +126,23 @@ export function StackDiagram({
         {layout.nodes.map(({ node, x, y }) => {
           const colors = CATEGORY_COLORS[node.category];
           const revealed = isRevealed ? isRevealed(node.id) : true;
+          const highlighted = highlightNodeId === node.id;
           return (
             <div
               key={node.id}
               className={cn(
-                "absolute flex items-center gap-2 rounded-xl border px-3",
+                "absolute flex items-center gap-2 rounded-xl border px-3 transition-transform",
                 colors.bg,
-                colors.border
+                colors.border,
+                highlighted && "z-10 scale-110 shadow-lg ring-2"
               )}
-              style={{ left: x, top: y, width: DIAGRAM_NODE_W, height: DIAGRAM_NODE_H }}
+              style={{
+                left: x,
+                top: y,
+                width: DIAGRAM_NODE_W,
+                height: DIAGRAM_NODE_H,
+                ...(highlighted ? { ["--tw-ring-color" as string]: "var(--brand-pink)" } : {}),
+              }}
             >
               <div
                 className={cn(

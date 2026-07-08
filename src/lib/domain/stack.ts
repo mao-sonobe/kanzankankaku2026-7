@@ -31,10 +31,16 @@ export interface TechStackNode {
   description: string;
   relatedPhraseIds: string[];
   /**
-   * STEP3の4択クイズ用。labelの代替になりそうな、もっともらしいが今回は最適でない技術。
+   * 4択クイズ用。labelの代替になりそうな、もっともらしいが今回は最適でない技術。
    * 旧形式(string[])の永続化データも読めるよう両対応。
    */
   wrongAnswers?: (string | StackWrongAnswer)[];
+  /**
+   * カードクイズの出題文。「企画のやりたいこと」でこの役割の必要性を表現した質問
+   * (例: 入力された感想を保存してみんなで共有したい。どの技術を使う?)。
+   * 無い場合はUI側が汎用文にフォールバックする。
+   */
+  quizQuestion?: string;
 }
 
 export interface TechStackEdge {
