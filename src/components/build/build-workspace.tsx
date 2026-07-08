@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,6 +19,7 @@ export function BuildWorkspace() {
   const stackProposal = useProjectStore((s) => s.stackProposal);
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
   const setGeneratedFiles = useProjectStore((s) => s.setGeneratedFiles);
+  const isPregenerating = useProjectStore((s) => s.isPregenerating);
   const previewUrl = useProjectStore((s) => s.previewUrl);
   const setPreviewUrl = useProjectStore((s) => s.setPreviewUrl);
 
@@ -84,6 +85,17 @@ export function BuildWorkspace() {
     }
   }
 
+  // クイズ中に先回し生成されたコードがある場合、/build到着時に自動で起動する。
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (autoStarted.current || previewUrl) return;
+    if (generatedFiles.length > 0 && (phase === "idle" || phase === "ready")) {
+      autoStarted.current = true;
+      void handleResume();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedFiles, previewUrl, phase]);
+
   if (!stackProposal) {
     return (
       <Card>
@@ -120,6 +132,11 @@ export function BuildWorkspace() {
               </Badge>
             ))}
           </div>
+          {isPregenerating && generatedFiles.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              クイズ中に生成したコードを準備しています…
+            </p>
+          )}
           <div className="flex gap-2">
             <Button onClick={handleGenerateAndRun} disabled={isBusy}>
               {phase === "generating" && "コードを生成中…"}

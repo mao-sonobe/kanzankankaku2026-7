@@ -96,7 +96,7 @@ export function QuizDeck({
       : null;
 
   return (
-    <div className="relative mx-auto h-[360px] w-full max-w-sm select-none">
+    <div className="relative mx-auto h-[420px] w-full max-w-md select-none">
       {/* 背後の重なりカード */}
       {remaining > 2 && (
         <div className="absolute inset-0 translate-x-3 translate-y-3 rotate-2 rounded-3xl border border-pink-200 bg-pink-100 shadow-sm" />
@@ -138,13 +138,13 @@ export function QuizDeck({
           </button>
         ))}
 
-        <div className="flex h-full items-center justify-center px-10 text-center">
-          <p className="text-sm font-medium leading-relaxed text-slate-700">
+        <div className="flex h-full items-center justify-center px-12 text-center">
+          <p className="text-[15px] font-medium leading-relaxed text-slate-700">
             {node.quizQuestion ?? "この役割に最適な技術はどれ?"}
           </p>
         </div>
 
-        <p className="absolute inset-x-0 bottom-12 text-center text-[11px] text-slate-500">
+        <p className="absolute inset-x-0 bottom-14 text-center text-[11px] text-slate-500">
           四隅をタップ、またはその方向へスワイプ
         </p>
       </div>

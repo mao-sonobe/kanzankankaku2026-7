@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
+import { useProjectStore } from "@/lib/store/project-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
-import { WizardSteps } from "./wizard-steps";
 import { StepChat } from "./step-chat";
 import { StepQuiz } from "./step-quiz";
 import { StepPipeline } from "./step-pipeline";
@@ -42,7 +41,6 @@ export function PlanWorkspace() {
   const [proposeError, setProposeError] = useState<string | null>(null);
 
   const provider = getAIProvider();
-  const maxReached: PlanStep = stackProposal ? 3 : 1;
 
   async function generateTitle(firstMessage: string) {
     try {
@@ -127,10 +125,6 @@ export function PlanWorkspace() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-center">
-        <WizardSteps current={planStep} maxReached={maxReached} onSelect={setPlanStep} />
-      </div>
-
       {planStep === 1 && (
         <StepChat
           chatMessages={chatMessages}

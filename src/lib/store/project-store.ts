@@ -31,6 +31,8 @@ interface ProjectState {
   highlighted: Highlight | null;
   pinned: boolean;
   generatedFiles: GeneratedFile[];
+  /** クイズ中に裏でコード生成を走らせている間true(非永続) */
+  isPregenerating: boolean;
   previewUrl: string | null;
   chunkedFiles: Record<string, ChunkedFile>;
   slotAnswers: Record<string, Record<string, string>>;
@@ -56,6 +58,7 @@ interface ProjectState {
   toggleClickHighlight: (highlight: Highlight) => void;
   resetStack: () => void;
   setGeneratedFiles: (files: GeneratedFile[]) => void;
+  setIsPregenerating: (value: boolean) => void;
   updateGeneratedFile: (path: string, content: string) => void;
   setPreviewUrl: (url: string | null) => void;
   setChunkedFile: (path: string, chunked: ChunkedFile) => void;
@@ -80,6 +83,7 @@ const INITIAL_STATE = {
   highlighted: null,
   pinned: false,
   generatedFiles: [],
+  isPregenerating: false,
   previewUrl: null,
   chunkedFiles: {},
   slotAnswers: {},
@@ -173,6 +177,8 @@ export const useProjectStore = create<ProjectState>()(
           previewUrl: null,
           dataFlow: null,
         }),
+
+      setIsPregenerating: (value) => set({ isPregenerating: value }),
 
       updateGeneratedFile: (path, content) =>
         set((state) => ({

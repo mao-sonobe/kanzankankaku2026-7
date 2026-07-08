@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { orderPipeline } from "@/lib/domain/stack-pipeline";
 import {
@@ -10,14 +10,16 @@ import {
   type QuizChoice,
 } from "@/lib/domain/stack-quiz";
 import type { TechStackProposal } from "@/lib/domain/stack";
+import { getAIProvider } from "@/lib/ai/get-provider";
+import { getScaffoldFiles } from "@/lib/generated-app/scaffold";
 import { useProjectStore } from "@/lib/store/project-store";
-import { StackDiagram } from "./stack-diagram";
+import { QuizPipeline } from "./quiz-pipeline";
 import { QuizDeck } from "./quiz-deck";
 import { QuizHistory, type QuizHistoryItem } from "./quiz-history";
 
 /**
- * ②カードクイズ。左=回答履歴 / 中央=回答するたび育つ構成図 / 右=カードデッキ。
- * 出題はパイプラインの流れ順。
+ * ②カードクイズ。左=回答履歴 / 中央=回答するたび育つ縦チェーン構成図 / 右=カードデッキ。
+ * 出題はパイプラインの流れ順。クイズ回答中に裏でコード生成を先回しする。
  */
 export function StepQuiz({
   proposal,
@@ -30,6 +32,7 @@ export function StepQuiz({
   const stackQuizSkipped = useProjectStore((s) => s.stackQuizSkipped);
   const answerQuizNode = useProjectStore((s) => s.answerQuizNode);
   const skipQuiz = useProjectStore((s) => s.skipQuiz);
+  const planText = useProjectStore((s) => s.planText);
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
@@ -39,6 +42,12 @@ export function StepQuiz({
     [ordered]
   );
 
+  // 回答済みノードをパイプライン順で(中央の縦チェーンに使う)
+  const revealedNodes = ordered.filter(
+    (n) => stackQuizSkipped || getQuizEntry(stackQuiz, n.id) || buildQuizChoices(n) === null
+  );
+
+  // 履歴カードは新しい順
   const answeredItems: QuizHistoryItem[] = quizNodes
     .filter((n) => getQuizEntry(stackQuiz, n.id))
     .map((n) => ({ node: n, entry: getQuizEntry(stackQuiz, n.id)! }))
@@ -46,18 +55,13 @@ export function StepQuiz({
 
   const currentNode = quizNodes.find((n) => !getQuizEntry(stackQuiz, n.id));
   const complete = isQuizComplete(proposal, stackQuiz, stackQuizSkipped);
-  const answeredCount = quizNodes.length - quizNodes.filter((n) => !getQuizEntry(stackQuiz, n.id)).length;
+  const answeredCount =
+    quizNodes.length - quizNodes.filter((n) => !getQuizEntry(stackQuiz, n.id)).length;
 
   const currentChoices = useMemo(
     () => (currentNode ? buildQuizChoices(currentNode) ?? [] : []),
     [currentNode]
   );
-
-  function isRevealed(nodeId: string) {
-    if (stackQuizSkipped) return true;
-    const node = proposal.nodes.find((n) => n.id === nodeId);
-    return !!getQuizEntry(stackQuiz, nodeId) || (node ? buildQuizChoices(node) === null : false);
-  }
 
   function handleAnswer(choice: QuizChoice) {
     if (!currentNode) return;
@@ -67,28 +71,49 @@ export function StepQuiz({
     );
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-end justify-between gap-2">
-        <div>
-          <h2 className="text-lg font-medium">技術スタッククイズ</h2>
-          <p className="text-sm text-muted-foreground">
-            やりたいことに合う技術を予想しましょう。答えるたびに構成図が育ちます。
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-muted-foreground">
-            クイズ {answeredCount}/{quizNodes.length}
-          </span>
-          {!complete && (
-            <Button variant="ghost" size="sm" onClick={skipQuiz}>
-              全部見る
-            </Button>
-          )}
-        </div>
-      </div>
+  // --- クイズ中にコード生成を先回し(/buildの待ち時間を消す) ---
+  const pregenStarted = useRef(false);
+  useEffect(() => {
+    const store = useProjectStore.getState();
+    if (pregenStarted.current) return;
+    if (store.generatedFiles.length > 0 || store.isPregenerating) return;
+    pregenStarted.current = true;
+    store.setIsPregenerating(true);
+    (async () => {
+      try {
+        const provider = getAIProvider();
+        const result = await provider.generateCode({
+          planSummary: planText,
+          stackNodes: proposal.nodes,
+        });
+        // /buildと同じくスキャフォールドをマージしておく
+        const scaffold = getScaffoldFiles();
+        const aiPaths = new Set(result.files.map((f) => f.path));
+        const merged = [...scaffold.filter((f) => !aiPaths.has(f.path)), ...result.files];
+        // 生成中にユーザーが/buildで自前生成した場合は上書きしない
+        if (useProjectStore.getState().generatedFiles.length === 0) {
+          useProjectStore.getState().setGeneratedFiles(merged);
+        }
+      } catch {
+        // 失敗しても/buildで再生成できるので握りつぶす
+      } finally {
+        useProjectStore.getState().setIsPregenerating(false);
+      }
+    })();
+  }, [planText, proposal]);
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[240px_1fr_400px]">
+  return (
+    <div className="relative">
+      {!complete && (
+        <div className="absolute right-0 top-0 z-20">
+          <Button variant="ghost" size="sm" onClick={skipQuiz}>
+            全部見る
+          </Button>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(130px,180px)_1fr_minmax(320px,420px)]">
+        {/* 左: 回答履歴 */}
         <div className="order-3 lg:order-1">
           <QuizHistory
             items={answeredItems}
@@ -97,15 +122,12 @@ export function StepQuiz({
           />
         </div>
 
-        <div className="order-2 rounded-2xl border-2 p-4" style={{ borderColor: "var(--brand-pink)" }}>
-          <StackDiagram
-            proposal={proposal}
-            isRevealed={isRevealed}
-            hideUnrevealed
-            highlightNodeId={hoveredNodeId}
-          />
+        {/* 中央: 縦チェーン構成図(枠なし) */}
+        <div className="order-2">
+          <QuizPipeline nodes={revealedNodes} highlightNodeId={hoveredNodeId} />
         </div>
 
+        {/* 右: カードデッキ */}
         <div className="order-1 lg:order-3">
           {!complete && currentNode ? (
             <QuizDeck
@@ -115,7 +137,7 @@ export function StepQuiz({
               onAnswer={handleAnswer}
             />
           ) : (
-            <div className="flex h-full min-h-[240px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
+            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
               <p className="text-sm font-medium">全カード回答済み!</p>
               <p className="text-xs text-muted-foreground">
                 次は、この技術たちの間をデータがどう流れるかを学びましょう。

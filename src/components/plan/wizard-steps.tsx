@@ -1,9 +1,9 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { BookOpen, Ear, FileCode2, Lightbulb, MessageCircleQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PlanStep } from "@/lib/store/project-store";
+import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
 
 // ①企画チャット ②カードクイズ ③パイプライン学習 ④コード生成(/build) ⑤コード理解(/learn)
 const STEPS: {
@@ -19,21 +19,39 @@ const STEPS: {
   { icon: Lightbulb, label: "コード理解", href: "/learn" },
 ];
 
-export function WizardSteps({
-  current,
-  maxReached,
-  onSelect,
-}: {
-  current: PlanStep;
-  maxReached: PlanStep;
-  onSelect: (step: PlanStep) => void;
-}) {
+/**
+ * ヘッダー中央に置く進捗シェブロン。plan配下ではストアのplanStepで、
+ * /build・/learnではpathnameで現在地を判定する。
+ */
+export function WizardSteps() {
   const router = useRouter();
+  const pathname = usePathname();
+  const planStep = useProjectStore((s) => s.planStep);
+  const stackProposal = useProjectStore((s) => s.stackProposal);
+  const generatedFiles = useProjectStore((s) => s.generatedFiles);
+
+  const onPlan = pathname === "/plan";
+  const maxPlanReached: PlanStep = stackProposal ? 3 : 1;
+  const hasCode = generatedFiles.length > 0;
+
+  function isActive(planStepOf?: PlanStep, href?: string): boolean {
+    if (href) return pathname === href;
+    if (!onPlan) return false;
+    return planStepOf === planStep;
+  }
+
+  function isReachable(planStepOf?: PlanStep, href?: string): boolean {
+    if (planStepOf !== undefined) return planStepOf <= maxPlanReached;
+    if (href === "/build") return !!stackProposal;
+    if (href === "/learn") return hasCode;
+    return false;
+  }
+
   return (
     <div className="flex">
-      {STEPS.map(({ icon: Icon, label, planStep, href }, i) => {
-        const active = planStep !== undefined && planStep === current;
-        const reachable = planStep !== undefined ? planStep <= maxReached : maxReached >= 3;
+      {STEPS.map(({ icon: Icon, label, planStep: ps, href }, i) => {
+        const active = isActive(ps, href);
+        const reachable = isReachable(ps, href);
         return (
           <button
             key={label}
@@ -44,12 +62,16 @@ export function WizardSteps({
             disabled={!reachable}
             onClick={() => {
               if (!reachable) return;
-              if (planStep !== undefined) onSelect(planStep);
-              else if (href) router.push(href);
+              if (ps !== undefined) {
+                if (onPlan) useProjectStore.getState().setPlanStep(ps);
+                else router.push("/plan");
+              } else if (href) {
+                router.push(href);
+              }
             }}
             className={cn(
-              "relative flex h-12 w-20 items-center justify-center border text-foreground transition-colors",
-              i > 0 && "-ml-2.5",
+              "relative flex h-11 w-16 items-center justify-center border text-foreground transition-colors",
+              i > 0 && "-ml-2",
               reachable ? "cursor-pointer hover:bg-muted" : "cursor-not-allowed opacity-40",
               active ? "z-10 border-2" : "border-foreground/70 bg-background"
             )}
