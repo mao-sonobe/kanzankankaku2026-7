@@ -27,6 +27,7 @@ export function LearnWorkspace() {
   const slotAnswers = useProjectStore((s) => s.slotAnswers);
   const setSlotAnswer = useProjectStore((s) => s.setSlotAnswer);
   const stackProposal = useProjectStore((s) => s.stackProposal);
+  const toggleClickHighlight = useProjectStore((s) => s.toggleClickHighlight);
 
   const learnableFiles = useMemo(
     () => generatedFiles.filter((f) => !SCAFFOLD_PATHS.has(f.path)),
@@ -57,6 +58,13 @@ export function LearnWorkspace() {
     (s) => s.type === "slot" && s.slot.id === activeSlotId
   );
   const activeSlotData = activeSlot?.type === "slot" ? activeSlot.slot : null;
+
+  function handleSlotClick(slotId: string) {
+    setActiveSlotId(slotId);
+    const slot = chunked?.segments.find((s) => s.type === "slot" && s.slot.id === slotId);
+    const nodeId = slot?.type === "slot" ? slot.slot.relatedStackNodeId : undefined;
+    if (nodeId) toggleClickHighlight({ type: "node", id: nodeId });
+  }
 
   // アクティブな空欄が技術スタックノードに紐づいている場合、
   // そのノードが関わるデータの流れ(エッジ)をパレットに表示する。
@@ -212,11 +220,17 @@ export function LearnWorkspace() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {chunked.summary && (
+                    <Alert className="mb-3">
+                      <AlertTitle>このファイルのポイント</AlertTitle>
+                      <AlertDescription>{chunked.summary}</AlertDescription>
+                    </Alert>
+                  )}
                   <CodeEditor
                     chunked={chunked}
                     answers={answers}
                     activeSlotId={activeSlotId}
-                    onSlotClick={setActiveSlotId}
+                    onSlotClick={handleSlotClick}
                     nodeById={nodeById}
                   />
                   {totalSlots > 0 && correctCount === totalSlots && (

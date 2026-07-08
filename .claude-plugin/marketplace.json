@@ -1,0 +1,12 @@
+{
+  "name": "learn-while-coding",
+  "owner": { "name": "mao-sonobe" },
+  "description": "コーディング中に、実際に選んだ技術スタックと実コードを可視化しながら学べるClaude Codeプラグインのマーケットプレイス",
+  "plugins": [
+    {
+      "name": "learn-while-coding",
+      "source": ".",
+      "description": "コーディング中に、実際に選んだ技術スタック間のデータの受け渡しと、実際に書いたコードの理解ポイントをその場で可視化する。ローカルLLMや外部AI APIは使わず、Claude Code自身が生成した内容をそのまま学習教材化する。"
+    }
+  ]
+}

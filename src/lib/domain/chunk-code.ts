@@ -30,6 +30,7 @@ export function buildChunkedFile(
   path: string,
   content: string,
   blanks: RawBlank[],
+  summary: string,
   validNodeIds?: Set<string>
 ): ChunkedFile {
   // CodeMirrorのウィジェット描画を単純にするため、複数行にまたがる空欄は除外する。
@@ -77,7 +78,7 @@ export function buildChunkedFile(
     segments.push({ type: "text", content: content.slice(cursor) });
   }
 
-  return { path, segments };
+  return { path, summary, segments };
 }
 
 /** 未回答のスロットに入れる、構文的に無害なプレースホルダー。 */

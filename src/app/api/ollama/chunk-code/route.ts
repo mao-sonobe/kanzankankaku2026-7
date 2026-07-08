@@ -42,6 +42,12 @@ const blankSchema = z.object({
 });
 
 const chunkCodeSchema = z.object({
+  summary: z
+    .string()
+    .describe(
+      "このファイルで何が重要か・どこが肝心な仕組みかを2〜3文の日本語で説明する概要。" +
+        "初心者が読んで「このファイルはここを理解すればよい」とわかる内容にする"
+    ),
   blanks: z
     .array(blankSchema)
     .min(2)
@@ -90,6 +96,7 @@ export async function POST(req: NextRequest) {
             "あなたは初心者エンジニア向けの穴埋め学習教材を作るコーチです。" +
             "与えられたコードを読み、学習に適した「意味のある単位」の空欄を3〜6個選んでください。\n\n" +
             "重要なルール:\n" +
+            "- summaryには、このファイルの中でも特に重要な仕組み・注目すべき箇所を2〜3文で説明すること。\n" +
             "- blanks[].text は元のコードから一字一句そのままコピーした連続する文字列にすること。要約や言い換えは禁止。\n" +
             "- 空欄は細かすぎない単位にする(1文字や1トークンではなく、式・関数呼び出し・JSXの一部など意味のあるまとまり)。\n" +
             "- 空欄は必ず1行に収まる範囲にする(複数行にまたがる空欄は禁止)。\n" +
@@ -97,6 +104,9 @@ export async function POST(req: NextRequest) {
             "- wrongAnswersには、textと文字数が近い、もっともらしいが動作としては誤ったコード片を1〜3個含める。\n" +
             "- explanationには、このコードが何をしていて、他の関数や技術とどうつながっているかを" +
               "初心者にも分かる1〜2文で説明する(例: 「fetchで取得したJSONをsetDataに渡し、画面に一覧表示します」)。\n" +
+            "- 与えられた技術スタックの技術がこの空欄で実際に使われている場合は、relatedStackNodeIdフィールド(labelとは別の専用フィールド)にそのidをそのまま入れて、コードと技術スタックの対応関係を示すこと。\n" +
+            "- relatedStackNodeIdという文字列自体をlabelやtextに書き込んではいけない。idの値だけをrelatedStackNodeIdフィールドに入れること。\n" +
+            '  例: { "text": "useState(0)", "role": "state", "label": "状態の初期化", "relatedStackNodeId": "state-1", "wrongAnswers": [...] }\n' +
             "- 空欄同士は重複しないようにする。" +
             (stackNodes.length > 0
               ? "\n- 技術スタックが与えられています。空欄は技術間のデータ受け渡しのコア部分" +
@@ -111,12 +121,28 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    const chunked = buildChunkedFile(
-      path,
-      content,
-      object.blanks,
-      new Set(stackNodes.map((n) => n.id))
-    );
+    const validStackIds = new Set(stackNodes.map((n) => n.id));
+    // ローカルLLMがrelatedStackNodeIdを専用フィールドではなくlabel/textに
+    // "relatedStackNodeId: xxx" のように書き込んでしまうことがあるため、
+    // 検出して本来のフィールドへ復元し、表示用テキストからは除去する。
+    const strayIdPattern = /relatedStackNodeId\s*[:=]\s*["']?([\w.-]+)["']?/i;
+    const sanitizedBlanks = object.blanks.map((b) => {
+      let relatedStackNodeId =
+        b.relatedStackNodeId && validStackIds.has(b.relatedStackNodeId)
+          ? b.relatedStackNodeId
+          : undefined;
+      let label = b.label;
+      if (!relatedStackNodeId) {
+        const match = label.match(strayIdPattern);
+        if (match && validStackIds.has(match[1])) {
+          relatedStackNodeId = match[1];
+          label = label.replace(strayIdPattern, "").trim();
+        }
+      }
+      return { ...b, label: label || b.label, relatedStackNodeId };
+    });
+
+    const chunked = buildChunkedFile(path, content, sanitizedBlanks, object.summary, validStackIds);
     const slotCount = chunked.segments.filter((s) => s.type === "slot").length;
     if (slotCount === 0) {
       return NextResponse.json(

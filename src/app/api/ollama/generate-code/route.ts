@@ -128,6 +128,8 @@ function normalizeFilePath(path: string): string {
   const baseName = cleaned.split("/").pop() ?? cleaned;
   const isRouteFile = /^(page|layout)\.(js|jsx|ts|tsx)$/.test(baseName);
   if (isRouteFile && !cleaned.startsWith("app/")) {
+    // ネストしたフォルダ構造(例: counter/page.js)は保持したままapp/配下に移す。
+    // basenameだけを使うと、異なるフォルダの複数ファイルが同じapp/page.jsに衝突しうる。
     return `app/${cleaned}`;
   }
   return cleaned;
@@ -197,6 +199,8 @@ export async function POST(req: NextRequest) {
         const path = normalizeFilePath(f.path);
         return { path, content: postProcessFile(path, f.content) };
       });
+    // 正規化後にパスが衝突した場合(異なる意図のファイルが同じパスになった場合)は
+    // 後勝ちで一意化し、無警告の上書きではなく決定的な結果にする。
     const files = Array.from(new Map(normalized.map((f) => [f.path, f])).values());
     if (files.length === 0) {
       return NextResponse.json(

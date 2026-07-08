@@ -37,13 +37,24 @@ export function BuildWorkspace() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
 
-  function appendLog(line: string) {
-    const cleaned = line.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/[\r\n]+/g, "\n").trim();
-    if (!cleaned) return;
-    setLogs((prev) => [...prev.slice(-300), cleaned]);
+  function appendLog(raw: string) {
+    // npmの進捗表示に含まれるANSI制御シーケンス(CSI/OSC)やスピナー用の点字文字(⠋⠙⠹…)を
+    // 取り除かないと、謎の記号だけが並んだログになってしまう。
+    const lines = raw
+      .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+      .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+      .replace(/\x1b[()][A-Za-z0-9]/g, "")
+      .replace(/\x1b/g, "")
+      .replace(/[⠀-⣿]/g, "")
+      .split(/\r\n|\r|\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return;
+    setLogs((prev) => [...prev, ...lines].slice(-300));
     queueMicrotask(() => logsEndRef.current?.scrollIntoView({ block: "end" }));
   }
 
@@ -177,14 +188,21 @@ export function BuildWorkspace() {
       {logs.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>実行ログ</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>実行ログ</span>
+              <Button variant="ghost" size="sm" onClick={() => setShowLogs((v) => !v)}>
+                {showLogs ? "隠す" : "詳細を表示"}
+              </Button>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <pre className="max-h-48 overflow-auto rounded-md border bg-black p-3 text-xs text-green-400">
-              {logs.join("\n")}
-              <div ref={logsEndRef} />
-            </pre>
-          </CardContent>
+          {showLogs && (
+            <CardContent>
+              <pre className="max-h-48 overflow-auto rounded-md border bg-black p-3 text-xs text-green-400">
+                {logs.join("\n")}
+                <div ref={logsEndRef} />
+              </pre>
+            </CardContent>
+          )}
         </Card>
       )}
     </div>

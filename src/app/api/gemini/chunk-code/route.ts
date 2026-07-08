@@ -42,6 +42,12 @@ const blankSchema = z.object({
 });
 
 const chunkCodeSchema = z.object({
+  summary: z
+    .string()
+    .describe(
+      "このファイルで何が重要か・どこが肝心な仕組みかを2〜3文の日本語で説明する概要。" +
+        "初心者が読んで「このファイルはここを理解すればよい」とわかる内容にする"
+    ),
   blanks: z
     .array(blankSchema)
     .min(2)
@@ -79,6 +85,7 @@ export async function POST(req: NextRequest) {
         "あなたは初心者エンジニア向けの穴埋め学習教材を作るコーチです。" +
         "与えられたコードを読み、学習に適した「意味のある単位」の空欄を3〜6個選んでください。\n\n" +
         "重要なルール:\n" +
+        "- summaryには、このファイルの中でも特に重要な仕組み・注目すべき箇所を2〜3文で説明すること。\n" +
         "- blanks[].text は元のコードから一字一句そのままコピーした連続する文字列にすること。要約や言い換えは禁止。\n" +
         "- 空欄は細かすぎない単位にする(1文字や1トークンではなく、式・関数呼び出し・JSXの一部など意味のあるまとまり)。\n" +
         "- 空欄は必ず1行に収まる範囲にする(複数行にまたがる空欄は禁止)。\n" +
@@ -104,6 +111,7 @@ export async function POST(req: NextRequest) {
       path,
       content,
       object.blanks,
+      object.summary,
       new Set(stackNodes.map((n) => n.id))
     );
     const slotCount = chunked.segments.filter((s) => s.type === "slot").length;
