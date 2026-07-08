@@ -33,6 +33,12 @@ const blankSchema = z.object({
     .describe(
       "この空欄が関わる技術スタックノードのid(与えられた一覧から)。データ受け渡しに関わる空欄では必須"
     ),
+  explanation: z
+    .string()
+    .describe(
+      "正解した学習者に見せる説明文(1〜2文、初心者向け)。このコードが何をしていて、" +
+        "他のどの部分(関数・技術)とどうつながっているかを説明する"
+    ),
 });
 
 const chunkCodeSchema = z.object({
@@ -89,6 +95,8 @@ export async function POST(req: NextRequest) {
             "- 空欄は必ず1行に収まる範囲にする(複数行にまたがる空欄は禁止)。\n" +
             "- roleは state(状態管理)/event-handler(イベントハンドラ)/api-fetch(APIフェッチ)/jsx(見た目)/logic(ロジック)/import(インポート)/style(スタイル)/other のいずれか。\n" +
             "- wrongAnswersには、textと文字数が近い、もっともらしいが動作としては誤ったコード片を1〜3個含める。\n" +
+            "- explanationには、このコードが何をしていて、他の関数や技術とどうつながっているかを" +
+              "初心者にも分かる1〜2文で説明する(例: 「fetchで取得したJSONをsetDataに渡し、画面に一覧表示します」)。\n" +
             "- 空欄同士は重複しないようにする。" +
             (stackNodes.length > 0
               ? "\n- 技術スタックが与えられています。空欄は技術間のデータ受け渡しのコア部分" +

@@ -8,6 +8,8 @@ export interface RawBlank {
   wrongAnswers: string[];
   /** この空欄が関わる技術スタックノードのid(任意) */
   relatedStackNodeId?: string;
+  /** 正解時に表示する説明文(任意) */
+  explanation?: string;
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -65,6 +67,7 @@ export function buildChunkedFile(
       label: m.item.label,
       choices,
       ...(relatedStackNodeId ? { relatedStackNodeId } : {}),
+      ...(m.item.explanation ? { explanation: m.item.explanation } : {}),
     };
     segments.push({ type: "slot", slot });
     cursor = m.end;

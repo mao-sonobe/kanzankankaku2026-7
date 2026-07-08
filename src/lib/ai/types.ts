@@ -65,6 +65,8 @@ export interface CodeBlockSlot {
   choices: CodeBlockChoice[];
   /** この空欄が関わる技術スタックノードのid(STEP3の提案との紐付け。任意) */
   relatedStackNodeId?: string;
+  /** 正解した際に表示する、このコードが何をしていて何とつながっているかの説明文(1〜2文) */
+  explanation?: string;
 }
 
 /** チャンク化されたファイル: ゴーストコード + 空欄スロットの並び */
