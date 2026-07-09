@@ -21,16 +21,16 @@ export function toFriendlyOllamaError(err: unknown): string {
   return message;
 }
 
-/** Gemini呼び出しの失敗理由を分かりやすいメッセージに変換する。 */
-export function toFriendlyGeminiError(err: unknown): string {
+/** ChatGPT(OpenAI)呼び出しの失敗理由を分かりやすいメッセージに変換する。 */
+export function toFriendlyOpenAIError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
   const lower = message.toLowerCase();
 
-  if (lower.includes("api_key") || lower.includes("api key") || lower.includes("google_generative_ai_api_key")) {
-    return "Gemini APIキーが未設定か無効です。.env.localのGOOGLE_GENERATIVE_AI_API_KEYを確認してください。";
+  if (lower.includes("api_key") || lower.includes("api key") || lower.includes("incorrect api key")) {
+    return "OpenAI APIキーが未設定か無効です。.env.localのOPENAI_API_KEYを確認してください。";
   }
   if (lower.includes("429") || lower.includes("quota") || lower.includes("rate limit")) {
-    return "Gemini APIのレート制限/クォータに達しました。しばらく待ってから再試行してください。";
+    return "OpenAI APIのレート制限/クォータに達しました。しばらく待ってから再試行してください。";
   }
   if (lower.includes("404") || lower.includes("not found") || lower.includes("model")) {
     return `指定したモデル名が無効な可能性があります。(詳細: ${message})`;

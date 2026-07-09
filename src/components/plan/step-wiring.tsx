@@ -98,7 +98,7 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          配線パズルはGeminiプロバイダーでのみ利用できます。設定でGeminiを選ぶと表示されます。
+          配線パズルはChatGPTプロバイダーでのみ利用できます。設定でChatGPTを選ぶと表示されます。
         </p>
         <div className="flex justify-between">
           <Button variant="outline" onClick={onBack}>

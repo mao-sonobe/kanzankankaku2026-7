@@ -1,6 +1,6 @@
 import type {
   AIProvider,
-  AnalyzeDataFlowOptions,
+  AnalyzeFeatureMapOptions,
   AnalyzeFeatureFlowsOptions,
   ChatOptions,
   ChunkCodeOptions,
@@ -10,20 +10,20 @@ import type {
   ProposeTechStackOptions,
 } from "./types";
 import type { TechStackProposal } from "@/lib/domain/stack";
-import type { DataFlowResult } from "@/lib/domain/data-flow";
+import type { FeatureMapResult } from "@/lib/domain/feature-map";
 import type { FeatureFlowResult } from "@/lib/domain/feature-flow";
 import type { AIProviderSettings } from "./types";
 
 /**
- * Gemini(Google Generative AI)を呼び出すAIProvider実装。実験用ブランチ。
- * OllamaAIProviderと同じNext.jsのRoute Handler(/api/gemini/*)経由の構造を踏襲する。
+ * ChatGPT(OpenAI)を呼び出すAIProvider実装。
+ * OllamaAIProviderと同じNext.jsのRoute Handler(/api/openai/*)経由の構造を踏襲する。
  * APIキーはクライアントに渡さず、サーバー側の環境変数からのみ読む。
  */
-export class GeminiAIProvider implements AIProvider {
+export class OpenAIAIProvider implements AIProvider {
   constructor(private settings: AIProviderSettings) {}
 
   async chat(options: ChatOptions, onToken: (token: string) => void): Promise<string> {
-    const res = await fetch("/api/gemini/chat", {
+    const res = await fetch("/api/openai/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: this.settings.model, messages: options.messages }),
@@ -46,13 +46,13 @@ export class GeminiAIProvider implements AIProvider {
       onToken(chunk);
     }
     if (!full.trim()) {
-      throw new Error("Geminiから応答がありませんでした。APIキーとモデル名を確認してください。");
+      throw new Error("ChatGPTから応答がありませんでした。APIキーとモデル名を確認してください。");
     }
     return full;
   }
 
   async proposeTechStack(options: ProposeTechStackOptions): Promise<TechStackProposal> {
-    const res = await fetch("/api/gemini/tech-stack", {
+    const res = await fetch("/api/openai/tech-stack", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -72,7 +72,7 @@ export class GeminiAIProvider implements AIProvider {
   }
 
   async generateCode(options: GenerateCodeOptions): Promise<GenerateCodeResult> {
-    const res = await fetch("/api/gemini/generate-code", {
+    const res = await fetch("/api/openai/generate-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -90,7 +90,7 @@ export class GeminiAIProvider implements AIProvider {
   }
 
   async chunkCode(options: ChunkCodeOptions): Promise<ChunkCodeResult> {
-    const res = await fetch("/api/gemini/chunk-code", {
+    const res = await fetch("/api/openai/chunk-code", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -107,8 +107,8 @@ export class GeminiAIProvider implements AIProvider {
     return data.result as ChunkCodeResult;
   }
 
-  async analyzeDataFlow(options: AnalyzeDataFlowOptions): Promise<DataFlowResult> {
-    const res = await fetch("/api/gemini/data-flow", {
+  async analyzeFeatureMap(options: AnalyzeFeatureMapOptions): Promise<FeatureMapResult> {
+    const res = await fetch("/api/openai/feature-map", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -120,13 +120,13 @@ export class GeminiAIProvider implements AIProvider {
     });
     const data = await res.json();
     if (!data.ok) {
-      throw new Error(data.error ?? "データフローの解析に失敗しました");
+      throw new Error(data.error ?? "機能マップの解析に失敗しました");
     }
-    return data.result as DataFlowResult;
+    return data.result as FeatureMapResult;
   }
 
   async analyzeFeatureFlows(options: AnalyzeFeatureFlowsOptions): Promise<FeatureFlowResult> {
-    const res = await fetch("/api/gemini/feature-flows", {
+    const res = await fetch("/api/openai/feature-flows", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -144,7 +144,7 @@ export class GeminiAIProvider implements AIProvider {
   }
 
   async checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }> {
-    const res = await fetch("/api/gemini/check", { method: "POST" });
+    const res = await fetch("/api/openai/check", { method: "POST" });
     return res.json();
   }
 }

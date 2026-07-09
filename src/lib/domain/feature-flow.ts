@@ -66,7 +66,7 @@ interface RawStep {
   kind: string;
   dataLabel: string;
   explanation: string;
-  uiResult?: string;
+  uiResult?: string | null;
 }
 interface RawFeature {
   name: string;

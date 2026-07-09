@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { validateFeatureFlows } from "@/lib/domain/feature-flow";
-import { getGoogleProvider, retryGemini } from "@/lib/ai/gemini-server";
-import { toFriendlyGeminiError } from "@/lib/ai/friendly-error";
+import { getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
+import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 // スキーマは小型モデルでも構造化出力できるよう緩めに定義し、
 // role/kindの正規化や件数チェックはサーバー側のvalidateFeatureFlowsで行う。
@@ -36,7 +36,10 @@ const featureFlowsSchema = z.object({
               kind: z.string().describe("呼び出し(データを渡す)=call / 戻り値(結果が返る)=return"),
               dataLabel: z.string().describe("この手順で渡る具体的なデータ(例: 入力された検索キーワード)"),
               explanation: z.string().describe("何がどこからどこへ渡るかの1〜2文の解説"),
-              uiResult: z.string().optional().describe("この手順の結果、画面に出るもの(あれば)"),
+              uiResult: z
+                .string()
+                .nullable()
+                .describe("この手順の結果、画面に出るもの。なければnull"),
             })
           )
           .describe("データが流れる順番のステップ一覧(実行順に並べる)"),
@@ -69,8 +72,8 @@ export async function POST(req: NextRequest) {
     .join("\n\n");
 
   try {
-    const provider = getGoogleProvider();
-    const { object } = await retryGemini(() => generateObject({
+    const provider = getOpenAIProvider();
+    const { object } = await retryOpenAI(() => generateObject({
       model: provider.chat(model),
       schema: featureFlowsSchema,
       system:
@@ -103,6 +106,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, result: { features } });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: toFriendlyGeminiError(err) }, { status: 200 });
+    return NextResponse.json({ ok: false, error: toFriendlyOpenAIError(err) }, { status: 200 });
   }
 }

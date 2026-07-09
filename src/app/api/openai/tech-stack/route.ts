@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getGoogleProvider, retryGemini } from "@/lib/ai/gemini-server";
-import { toFriendlyGeminiError } from "@/lib/ai/friendly-error";
+import { getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
+import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const STACK_CATEGORIES = ["frontend", "backend", "infra", "data", "other"] as const;
 
@@ -87,38 +87,38 @@ export async function POST(req: NextRequest) {
     : "";
 
   try {
-    const provider = getGoogleProvider();
-    const { object } = await retryGemini(() => generateObject({
+    const provider = getOpenAIProvider();
+    const { object } = await retryOpenAI(() => generateObject({
       model: provider.chat(model),
       schema: techStackSchema,
       system:
-        "あなたは初心者エンジニアの開発を支援するAIアーキテクトです。" +
-        "企画書と対話内容から、実装に必要な技術スタックを提案してください。\n\n" +
-        "重要なルール:\n" +
-        "- phrases.text は企画書本文から一字一句そのままコピーした短い抜粋(5〜20文字程度)にしてください。要約や言い換えは禁止です。\n" +
-        "- 例: 企画書が「複数人でリアルタイムに編集できるようにしたい」を含む場合、phrases.text は\"リアルタイムに編集\"のように本文中の連続した文字列そのものにしてください。\n" +
-        "- 各技術ノード(nodes)は、なぜその技術が必要かをdescriptionで説明し、関連するphrasesのidをrelatedPhraseIdsに列挙してください。\n" +
-        "- nodes.label は必ず実在する固有の技術名にしてください(例: Node.js, Next.js, React, PostgreSQL, Redis, Prisma, Docker, Vercel, AWS S3)。" +
-        "「バックエンド」「データベース」「インフラ」のような抽象的な総称や、カテゴリ名そのままの言い換えは禁止です。\n" +
-        "- 少なくとも1つは実行環境/言語(例: Node.js)、1つはフレームワーク、必要なら永続化層・インフラのノードも固有名詞で含めてください。\n" +
-        "- カテゴリは frontend/backend/infra/data/other のいずれかにしてください。\n" +
-        "- 各ノードのwrongAnswersには、その役割を担えそうな実在の代替技術を必ず3つ挙げてください" +
-        "(学習者向けの4択クイズの誤答として使います)。labelと同カテゴリ・同粒度の固有名詞にし、" +
-        "label自体や他ノードのlabelと重複させないでください。" +
-        "各誤答のreasonには「その技術も実在の選択肢だが、今回の企画には最適でない理由」を" +
-        "初心者に分かる1文で書いてください(技術をけなすのではなく、企画との相性で説明する)。\n" +
-        "- 各ノードのquizQuestionは、ユーザーの企画で実現したいことの言葉で「この役割がなぜ必要か」を表す質問文にしてください。" +
-        "技術名やカテゴリ名をネタバレしないこと。\n" +
-        "- 各エッジのlabelには「その2つの技術間で実際に渡る具体的なデータの中身」を書いてください" +
-        "(例: 『ユーザーが入力した本の検索キーワード』『感想テキストと星評価のJSON』『認証済みユーザーのセッショントークン』)。" +
-        "『APIリクエスト』『データ』『関係がある』のような抽象的・曖昧な表現は禁止で、企画の実データで表現してください。\n" +
-        "- ノード数は3〜8個程度、フレーズ数は3〜8個程度に抑えてください。" +
-        (isRegeneration
-          ? "\n\n【再生成モード】現在の提案(JSON)とユーザーの変更要望が与えられます。" +
-            "変更要望に関係するノード/エッジ**だけ**を変更し、それ以外のnodes/edges/idは現在の提案からそのまま維持してください。" +
-            "既存のidは変更しないこと(新しいノードを追加する場合のみ新しいidを発行してよい)。" +
-            "維持するノードも含め、全ノードのwrongAnswersを必ず3つ埋めてください。"
-          : ""),
+            "あなたは初心者エンジニアの開発を支援するAIアーキテクトです。" +
+            "企画書と対話内容から、実装に必要な技術スタックを提案してください。\n\n" +
+            "重要なルール:\n" +
+            "- phrases.text は企画書本文から一字一句そのままコピーした短い抜粋(5〜20文字程度)にしてください。要約や言い換えは禁止です。\n" +
+            "- 例: 企画書が「複数人でリアルタイムに編集できるようにしたい」を含む場合、phrases.text は\"リアルタイムに編集\"のように本文中の連続した文字列そのものにしてください。\n" +
+            "- 各技術ノード(nodes)は、なぜその技術が必要かをdescriptionで説明し、関連するphrasesのidをrelatedPhraseIdsに列挙してください。\n" +
+            "- nodes.label は必ず実在する固有の技術名にしてください(例: Node.js, Next.js, React, PostgreSQL, Redis, Prisma, Docker, Vercel, AWS S3)。" +
+            "「バックエンド」「データベース」「インフラ」のような抽象的な総称や、カテゴリ名そのままの言い換えは禁止です。\n" +
+            "- 少なくとも1つは実行環境/言語(例: Node.js)、1つはフレームワーク、必要なら永続化層・インフラのノードも固有名詞で含めてください。\n" +
+            "- カテゴリは frontend/backend/infra/data/other のいずれかにしてください。\n" +
+            "- 各ノードのwrongAnswersには、その役割を担えそうな実在の代替技術を必ず3つ挙げてください" +
+            "(学習者向けの4択クイズの誤答として使います)。labelと同カテゴリ・同粒度の固有名詞にし、" +
+            "label自体や他ノードのlabelと重複させないでください。" +
+            "各誤答のreasonには「その技術も実在の選択肢だが、今回の企画には最適でない理由」を" +
+            "初心者に分かる1文で書いてください(技術をけなすのではなく、企画との相性で説明する)。\n" +
+            "- 各ノードのquizQuestionは、ユーザーの企画で実現したいことの言葉で「この役割がなぜ必要か」を表す質問文にしてください。" +
+            "技術名やカテゴリ名をネタバレしないこと。\n" +
+            "- 各エッジのlabelには「その2つの技術間で実際に渡る具体的なデータの中身」を書いてください" +
+            "(例: 『ユーザーが入力した本の検索キーワード』『感想テキストと星評価のJSON』『認証済みユーザーのセッショントークン』)。" +
+            "『APIリクエスト』『データ』『関係がある』のような抽象的・曖昧な表現は禁止で、企画の実データで表現してください。\n" +
+            "- ノード数は3〜8個程度、フレーズ数は3〜8個程度に抑えてください。" +
+            (isRegeneration
+              ? "\n\n【再生成モード】現在の提案(JSON)とユーザーの変更要望が与えられます。" +
+                "変更要望に関係するノード/エッジ**だけ**を変更し、それ以外のnodes/edges/idは現在の提案からそのまま維持してください。" +
+                "既存のidは変更しないこと(新しいノードを追加する場合のみ新しいidを発行してよい)。" +
+                "維持するノードも含め、全ノードのwrongAnswersを必ず3つ埋めてください。"
+              : ""),
       messages: [
         {
           role: "user",
@@ -144,6 +144,6 @@ export async function POST(req: NextRequest) {
     };
     return NextResponse.json({ ok: true, proposal });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: toFriendlyGeminiError(err) }, { status: 200 });
+    return NextResponse.json({ ok: false, error: toFriendlyOpenAIError(err) }, { status: 200 });
   }
 }
