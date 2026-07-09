@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 import type { ChatMessage, ChunkedFile, GeneratedFile } from "@/lib/ai/types";
 import type { TechStackProposal } from "@/lib/domain/stack";
 import { reconcileQuizState, type StackQuizEntry, type StackQuizState } from "@/lib/domain/stack-quiz";
-import type { DataFlowResult } from "@/lib/domain/data-flow";
+import type { FeatureMapResult } from "@/lib/domain/feature-map";
 import { idbStorage } from "./idb-storage";
 
 export interface Highlight {
@@ -36,8 +36,8 @@ interface ProjectState {
   previewUrl: string | null;
   chunkedFiles: Record<string, ChunkedFile>;
   slotAnswers: Record<string, Record<string, string>>;
-  /** データフロー解説の解析結果(生成コードに紐づく) */
-  dataFlow: DataFlowResult | null;
+  /** 機能マップの解析結果(生成コードに紐づく) */
+  featureMap: FeatureMapResult | null;
   hasHydrated: boolean;
 
   setPlanStep: (step: PlanStep) => void;
@@ -52,7 +52,7 @@ interface ProjectState {
   ) => void;
   answerQuizNode: (nodeId: string, entry: StackQuizEntry) => void;
   skipQuiz: () => void;
-  setDataFlow: (result: DataFlowResult | null) => void;
+  setFeatureMap: (result: FeatureMapResult | null) => void;
   hoverHighlight: (highlight: Highlight) => void;
   clearHoverHighlight: (highlight: Highlight) => void;
   toggleClickHighlight: (highlight: Highlight) => void;
@@ -87,7 +87,7 @@ const INITIAL_STATE = {
   previewUrl: null,
   chunkedFiles: {},
   slotAnswers: {},
-  dataFlow: null,
+  featureMap: null,
 };
 
 export const useProjectStore = create<ProjectState>()(
@@ -139,7 +139,7 @@ export const useProjectStore = create<ProjectState>()(
 
       skipQuiz: () => set({ stackQuizSkipped: true }),
 
-      setDataFlow: (result) => set({ dataFlow: result }),
+      setFeatureMap: (result) => set({ featureMap: result }),
 
       hoverHighlight: (highlight) => {
         if (!get().pinned) set({ highlighted: highlight });
@@ -175,7 +175,7 @@ export const useProjectStore = create<ProjectState>()(
           chunkedFiles: {},
           slotAnswers: {},
           previewUrl: null,
-          dataFlow: null,
+          featureMap: null,
         }),
 
       setIsPregenerating: (value) => set({ isPregenerating: value }),
@@ -205,13 +205,18 @@ export const useProjectStore = create<ProjectState>()(
     {
       name: "project-state",
       storage: createJSONStorage(() => idbStorage),
-      version: 2,
+      version: 3,
       // v1(4ステップ構成)の永続化データを3ステップ構成へ変換する。
+      // v2→v3: dataFlow(技術スタックのエッジ単位)をfeatureMap(機能単位、ファイル横断)に置き換え。
       migrate: (persisted, version) => {
-        const state = persisted as Partial<ProjectState> & { planStep?: number };
+        const state = persisted as Partial<ProjectState> & { planStep?: number; dataFlow?: unknown };
         if (version < 2) {
           const old = state.planStep ?? 1;
           state.planStep = (old <= 2 ? 1 : old === 3 ? 2 : 3) as PlanStep;
+        }
+        if (version < 3) {
+          delete state.dataFlow;
+          state.featureMap = null;
         }
         return state as ProjectState;
       },
@@ -228,7 +233,7 @@ export const useProjectStore = create<ProjectState>()(
         generatedFiles: state.generatedFiles,
         chunkedFiles: state.chunkedFiles,
         slotAnswers: state.slotAnswers,
-        dataFlow: state.dataFlow,
+        featureMap: state.featureMap,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

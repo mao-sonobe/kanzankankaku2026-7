@@ -1,8 +1,8 @@
 // AIプロバイダーの抽象化。呼び出し元（対話UI・コード生成・チャンク化処理）は
-// このインターフェースにのみ依存し、具体的なプロバイダー実装（Ollama/将来のGemini等）を意識しない。
+// このインターフェースにのみ依存し、具体的なプロバイダー実装（Ollama/OpenAI等）を意識しない。
 
 import type { TechStackProposal } from "@/lib/domain/stack";
-import type { DataFlowResult } from "@/lib/domain/data-flow";
+import type { FeatureMapResult } from "@/lib/domain/feature-map";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -56,6 +56,8 @@ export interface CodeBlockChoice {
   id: string;
   code: string;
   isCorrect: boolean;
+  /** 不正解の場合、なぜこのコードでは動かないかの理由(初心者向け1文) */
+  reason?: string;
 }
 
 export interface CodeBlockSlot {
@@ -92,15 +94,15 @@ export interface ChunkCodeResult {
   chunked: ChunkedFile;
 }
 
-export interface AnalyzeDataFlowOptions {
+export interface AnalyzeFeatureMapOptions {
   files: GeneratedFile[];
-  stackProposal: TechStackProposal;
+  stackProposal?: TechStackProposal;
   signal?: AbortSignal;
 }
 
 /**
  * AI呼び出しの抽象インターフェース。
- * v1実装は OllamaAIProvider のみ。将来 GeminiAIProvider に差し替える計画があるため
+ * OllamaAIProvider / OpenAIAIProvider を実装として持つため、
  * 呼び出し元はこの型にのみ依存すること。
  */
 export interface AIProvider {
@@ -111,15 +113,16 @@ export interface AIProvider {
   generateCode(options: GenerateCodeOptions): Promise<GenerateCodeResult>;
   chunkCode(options: ChunkCodeOptions): Promise<ChunkCodeResult>;
   /**
-   * 生成コード内で技術スタックのエッジ(データの流れ)が実装されている箇所を特定する。
+   * 生成コードを機能単位(例: 「予定の追加」)に分解し、各機能がどのファイル・
+   * どのコード片で実装されているかを特定する(ファイルをまたいでもよい)。
    * 未対応のプロバイダー(Ollama)は実装しなくてよく、UI側はその場合機能を隠す。
    */
-  analyzeDataFlow?(options: AnalyzeDataFlowOptions): Promise<DataFlowResult>;
+  analyzeFeatureMap?(options: AnalyzeFeatureMapOptions): Promise<FeatureMapResult>;
   /** 疎通確認。利用可能なモデル一覧を返す */
   checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }>;
 }
 
-export type AIProviderKind = "ollama" | "gemini";
+export type AIProviderKind = "ollama" | "openai";
 
 export interface AIProviderSettings {
   provider: AIProviderKind;

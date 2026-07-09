@@ -5,7 +5,7 @@ export interface RawBlank {
   text: string;
   role: BlockRole;
   label: string;
-  wrongAnswers: string[];
+  wrongAnswers: { code: string; reason: string }[];
   /** この空欄が関わる技術スタックノードのid(任意) */
   relatedStackNodeId?: string;
   /** 正解時に表示する説明文(任意) */
@@ -50,12 +50,13 @@ export function buildChunkedFile(
     const choices: CodeBlockChoice[] = shuffle([
       { id: `slot-${slotIndex}-correct`, code: correctCode, isCorrect: true },
       ...m.item.wrongAnswers
-        .filter((w) => w.trim() && w.trim() !== correctCode.trim())
+        .filter((w) => w.code.trim() && w.code.trim() !== correctCode.trim())
         .slice(0, 3)
         .map((w, i) => ({
           id: `slot-${slotIndex}-wrong-${i}`,
-          code: w,
+          code: w.code,
           isCorrect: false,
+          reason: w.reason,
         })),
     ]);
     const relatedStackNodeId =

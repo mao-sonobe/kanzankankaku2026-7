@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
 import { buildChunkedFile } from "@/lib/domain/chunk-code";
-import { toFriendlyOllamaError } from "@/lib/ai/friendly-error";
+import { getOpenAIProvider } from "@/lib/ai/openai-server";
+import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const BLOCK_ROLES = [
   "state",
@@ -36,9 +36,10 @@ const blankSchema = z.object({
     .describe("もっともらしいが誤った選択肢(理由つき)"),
   relatedStackNodeId: z
     .string()
-    .optional()
+    .nullable()
     .describe(
-      "この空欄が関わる技術スタックノードのid(与えられた一覧から)。データ受け渡しに関わる空欄では必須"
+      "この空欄が関わる技術スタックノードのid(与えられた一覧から)。データ受け渡しに関わる空欄では必須。" +
+        "該当がなければnullにする"
     ),
   explanation: z
     .string()
@@ -63,7 +64,7 @@ const chunkCodeSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const { endpoint, model, file, stackProposal } = await req.json();
+  const { model, file, stackProposal } = await req.json();
   const path: string = file?.path ?? "";
   const content: string = file?.content ?? "";
 
@@ -83,23 +84,12 @@ export async function POST(req: NextRequest) {
           .join("\n")}`
       : "";
 
-  const provider = createOpenAICompatible({
-    name: "ollama",
-    baseURL: `${String(endpoint).replace(/\/$/, "")}/v1`,
-    supportsStructuredOutputs: true,
-  });
-
   try {
+    const provider = getOpenAIProvider();
     const { object } = await generateObject({
-      model: provider.chatModel(model),
+      model: provider.chat(model),
       schema: chunkCodeSchema,
-      allowSystemInMessages: true,
-      // Qwen3等の推論モデルはデフォルトで長い思考過程を出力し遅くなるため無効化する。
-      providerOptions: { ollama: { reasoningEffort: "none" } },
-      messages: [
-        {
-          role: "system",
-          content:
+      system:
             "あなたは初心者エンジニア向けの穴埋め学習教材を作るコーチです。" +
             "与えられたコードを読み、学習に適した「意味のある単位」の空欄を3〜6個選んでください。\n\n" +
             "重要なルール:\n" +
@@ -121,7 +111,7 @@ export async function POST(req: NextRequest) {
                 "(fetch呼び出し、APIレスポンスの処理、propsやstateへの受け渡し)を優先して選び、" +
                 "その空欄が関わる技術のidをrelatedStackNodeIdに設定してください。"
               : ""),
-        },
+      messages: [
         {
           role: "user",
           content: `ファイル: ${path}\n\n\`\`\`\n${content}\n\`\`\`${stackContext}\n\nこのコードの穴埋め学習教材を作成してください。`,
@@ -130,7 +120,7 @@ export async function POST(req: NextRequest) {
     });
 
     const validStackIds = new Set(stackNodes.map((n) => n.id));
-    // ローカルLLMがrelatedStackNodeIdを専用フィールドではなくlabel/textに
+    // モデルがrelatedStackNodeIdを専用フィールドではなくlabel/textに
     // "relatedStackNodeId: xxx" のように書き込んでしまうことがあるため、
     // 検出して本来のフィールドへ復元し、表示用テキストからは除去する。
     const strayIdPattern = /relatedStackNodeId\s*[:=]\s*["']?([\w.-]+)["']?/i;
@@ -161,6 +151,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, result: { chunked } });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: toFriendlyOllamaError(err) }, { status: 200 });
+    return NextResponse.json({ ok: false, error: toFriendlyOpenAIError(err) }, { status: 200 });
   }
 }
