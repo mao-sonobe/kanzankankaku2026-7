@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { validateDataFlowSpans } from "@/lib/domain/data-flow";
-import { getGoogleProvider } from "@/lib/ai/gemini-server";
-import { toFriendlyGeminiError } from "@/lib/ai/friendly-error";
+import { getOpenAIProvider } from "@/lib/ai/openai-server";
+import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const dataFlowSchema = z.object({
   spans: z
@@ -61,20 +61,20 @@ export async function POST(req: NextRequest) {
     .join("\n");
 
   try {
-    const provider = getGoogleProvider();
+    const provider = getOpenAIProvider();
     const { object } = await generateObject({
       model: provider.chat(model),
       schema: dataFlowSchema,
       system:
-        "あなたは初心者エンジニアに「データの流れ」を教えるコーチです。" +
-        "生成されたコードと技術スタック(ノードとエッジ)が与えられます。" +
-        "各エッジ(技術Aから技術Bへのデータの流れ)がコード上のどこで実現されているかを特定してください。\n\n" +
-        "重要なルール:\n" +
-        "- text は必ず該当ファイルの本文から一字一句そのままコピーした連続する文字列にすること。要約や言い換えは禁止。\n" +
-        "- fetch呼び出し、APIレスポンスのstateへの格納、propsの受け渡し、イベントからの状態更新など" +
-        "「データが移動する瞬間」を選ぶこと。\n" +
-        "- 各エッジにつき1〜2箇所。コードに現れないエッジは無理に挙げなくてよい。\n" +
-        "- explanationは「何のデータが、どこから、どこへ」が一目で分かる短い日本語で。",
+            "あなたは初心者エンジニアに「データの流れ」を教えるコーチです。" +
+            "生成されたコードと技術スタック(ノードとエッジ)が与えられます。" +
+            "各エッジ(技術Aから技術Bへのデータの流れ)がコード上のどこで実現されているかを特定してください。\n\n" +
+            "重要なルール:\n" +
+            "- text は必ず該当ファイルの本文から一字一句そのままコピーした連続する文字列にすること。要約や言い換えは禁止。\n" +
+            "- fetch呼び出し、APIレスポンスのstateへの格納、propsの受け渡し、イベントからの状態更新など" +
+            "「データが移動する瞬間」を選ぶこと。\n" +
+            "- 各エッジにつき1〜2箇所。コードに現れないエッジは無理に挙げなくてよい。\n" +
+            "- explanationは「何のデータが、どこから、どこへ」が一目で分かる短い日本語で。",
       messages: [
         {
           role: "user",
@@ -95,6 +95,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, result: { spans } });
   } catch (err) {
-    return NextResponse.json({ ok: false, error: toFriendlyGeminiError(err) }, { status: 200 });
+    return NextResponse.json({ ok: false, error: toFriendlyOpenAIError(err) }, { status: 200 });
   }
 }

@@ -169,7 +169,7 @@ export function DataFlowView({ onProceedToFill }: { onProceedToFill: () => void 
         <CardHeader>
           <CardTitle>データフロー解説はこのAIプロバイダーでは利用できません</CardTitle>
           <CardDescription>
-            設定でGeminiプロバイダーを選ぶと利用できます。穴埋め学習はそのまま進められます。
+            設定でChatGPTプロバイダーを選ぶと利用できます。穴埋め学習はそのまま進められます。
           </CardDescription>
         </CardHeader>
         <CardContent>

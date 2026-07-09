@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DEFAULT_AI_SETTINGS, GEMINI_DEFAULT_MODEL, loadAISettings, saveAISettings } from "@/lib/ai/settings";
+import { DEFAULT_AI_SETTINGS, OPENAI_DEFAULT_MODEL, loadAISettings, saveAISettings } from "@/lib/ai/settings";
 import type { AIProviderKind } from "@/lib/ai/types";
 import { useProjectStore } from "@/lib/store/project-store";
 
@@ -40,8 +40,8 @@ export default function SettingsPage() {
     setConn({ status: "idle" });
     // プロバイダー切り替え時、モデル名が切り替え前のデフォルトのままなら
     // 新しいプロバイダーの適切なデフォルトに合わせる。
-    if (model === DEFAULT_AI_SETTINGS.model || model === GEMINI_DEFAULT_MODEL) {
-      setModel(next === "gemini" ? GEMINI_DEFAULT_MODEL : DEFAULT_AI_SETTINGS.model);
+    if (model === DEFAULT_AI_SETTINGS.model || model === OPENAI_DEFAULT_MODEL) {
+      setModel(next === "ollama" ? "qwen3:8b" : OPENAI_DEFAULT_MODEL);
     }
   }
 
@@ -55,7 +55,7 @@ export default function SettingsPage() {
     setConn({ status: "checking" });
     saveAISettings({ provider, endpoint, model });
     try {
-      const res = await fetch(provider === "gemini" ? "/api/gemini/check" : "/api/ollama/tags", {
+      const res = await fetch(provider === "ollama" ? "/api/ollama/tags" : "/api/openai/check", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ endpoint }),
@@ -81,8 +81,8 @@ export default function SettingsPage() {
     <div className="mx-auto w-full max-w-2xl flex-1 px-6 py-12">
       <h1 className="text-2xl font-bold tracking-tight">AIプロバイダー設定</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        {provider === "gemini"
-          ? "Gemini(Google Generative AI)を使用します。APIキーはサーバー側の.env.localに設定してください(このAPIキーはブラウザには渡りません)。"
+        {provider === "openai"
+          ? "ChatGPT(OpenAI)を使用します。APIキーはサーバー側の.env.localに設定してください(このAPIキーはブラウザには渡りません)。"
           : <>
               このアプリはローカルで動作するOllamaを利用します。事前に <code>ollama serve</code>{" "}
               を起動し、使用したいモデルを <code>ollama pull</code> 済みにしておいてください。
@@ -100,8 +100,8 @@ export default function SettingsPage() {
             <Label>プロバイダー</Label>
             <Tabs value={provider} onValueChange={(v) => handleProviderChange(v as AIProviderKind)}>
               <TabsList>
+                <TabsTrigger value="openai">ChatGPT</TabsTrigger>
                 <TabsTrigger value="ollama">Ollama(ローカル)</TabsTrigger>
-                <TabsTrigger value="gemini">Gemini(実験)</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -122,7 +122,7 @@ export default function SettingsPage() {
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder={provider === "gemini" ? GEMINI_DEFAULT_MODEL : "qwen3:8b"}
+              placeholder={provider === "ollama" ? "qwen3:8b" : OPENAI_DEFAULT_MODEL}
             />
           </div>
 
@@ -144,9 +144,9 @@ export default function SettingsPage() {
                   {conn.models.length === 0 && (
                     <span className="text-sm">
                       モデルが1つも見つかりませんでした。
-                      {provider === "gemini"
-                        ? "APIキーの権限を確認してください。"
-                        : `\`ollama pull ${model}\` を実行してください。`}
+                      {provider === "ollama"
+                        ? `\`ollama pull ${model}\` を実行してください。`
+                        : "APIキーの権限を確認してください。"}
                     </span>
                   )}
                   {conn.models.map((m) => (

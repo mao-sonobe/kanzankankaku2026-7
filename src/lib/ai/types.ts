@@ -1,5 +1,5 @@
 // AIプロバイダーの抽象化。呼び出し元（対話UI・コード生成・チャンク化処理）は
-// このインターフェースにのみ依存し、具体的なプロバイダー実装（Ollama/将来のGemini等）を意識しない。
+// このインターフェースにのみ依存し、具体的なプロバイダー実装（Ollama/OpenAI等）を意識しない。
 
 import type { TechStackProposal } from "@/lib/domain/stack";
 import type { DataFlowResult } from "@/lib/domain/data-flow";
@@ -100,7 +100,7 @@ export interface AnalyzeDataFlowOptions {
 
 /**
  * AI呼び出しの抽象インターフェース。
- * v1実装は OllamaAIProvider のみ。将来 GeminiAIProvider に差し替える計画があるため
+ * OllamaAIProvider / OpenAIAIProvider を実装として持つため、
  * 呼び出し元はこの型にのみ依存すること。
  */
 export interface AIProvider {
@@ -119,7 +119,7 @@ export interface AIProvider {
   checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }>;
 }
 
-export type AIProviderKind = "ollama" | "gemini";
+export type AIProviderKind = "ollama" | "openai";
 
 export interface AIProviderSettings {
   provider: AIProviderKind;
