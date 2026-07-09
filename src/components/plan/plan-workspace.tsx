@@ -68,10 +68,7 @@ export function PlanWorkspace() {
     setChatError(null);
 
     const isFirst = useProjectStore.getState().chatMessages.length === 0;
-    if (isFirst) {
-      setPlanText(text);
-      void generateTitle(text);
-    }
+    if (isFirst) setPlanText(text);
     addChatMessage({ role: "user", content: text });
     const history = useProjectStore.getState().chatMessages;
 
@@ -96,6 +93,10 @@ export function PlanWorkspace() {
     } finally {
       setIsChatting(false);
     }
+
+    // 企画名は装飾なので、ヒアリング応答が終わってから直列で生成する
+    // (初回メッセージでchat呼び出しを同時に2本走らせるとレート制限に当たりやすいため)。
+    if (isFirst) void generateTitle(text);
   }
 
   async function proposeStack() {
