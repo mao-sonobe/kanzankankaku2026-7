@@ -34,6 +34,10 @@ export function BuildWorkspace() {
   const isPregenerating = useProjectStore((s) => s.isPregenerating);
   const previewUrl = useProjectStore((s) => s.previewUrl);
   const setPreviewUrl = useProjectStore((s) => s.setPreviewUrl);
+  const setLastScreen = useProjectStore((s) => s.setLastScreen);
+  useEffect(() => {
+    setLastScreen("build");
+  }, [setLastScreen]);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);

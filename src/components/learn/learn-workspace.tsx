@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,6 +28,10 @@ export function LearnWorkspace() {
   const setSlotAnswer = useProjectStore((s) => s.setSlotAnswer);
   const stackProposal = useProjectStore((s) => s.stackProposal);
   const toggleClickHighlight = useProjectStore((s) => s.toggleClickHighlight);
+  const setLastScreen = useProjectStore((s) => s.setLastScreen);
+  useEffect(() => {
+    setLastScreen("learn");
+  }, [setLastScreen]);
 
   const learnableFiles = useMemo(
     () => generatedFiles.filter((f) => !SCAFFOLD_PATHS.has(f.path)),

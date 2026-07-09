@@ -5,6 +5,7 @@ import type { TechStackProposal } from "@/lib/domain/stack";
 import { reconcileQuizState, type StackQuizEntry, type StackQuizState } from "@/lib/domain/stack-quiz";
 import type { DataFlowResult } from "@/lib/domain/data-flow";
 import type { FeatureFlowResult } from "@/lib/domain/feature-flow";
+import type { HearingRow } from "@/lib/supabase/hearings";
 import { idbStorage } from "./idb-storage";
 
 export interface Highlight {
@@ -14,6 +15,9 @@ export interface Highlight {
 
 /** ①企画チャット ②カードクイズ ③全体の技術フロー ④配線パズル */
 export type PlanStep = 1 | 2 | 3 | 4;
+
+/** 最後に開いていた画面(/plan, /build, /learn)。履歴からの再開先を決めるために使う。 */
+export type Screen = "plan" | "build" | "learn";
 
 interface ProjectState {
   planStep: PlanStep;
@@ -41,6 +45,10 @@ interface ProjectState {
   dataFlow: DataFlowResult | null;
   /** 配線パズル(機能ごとのデータフロー)の解析結果(生成コードに紐づく) */
   featureFlows: FeatureFlowResult | null;
+  /** ログイン中に同期しているSupabase `hearings`行のid(未保存/未ログインならnull) */
+  currentHearingId: string | null;
+  /** 最後に開いていた画面。履歴から再開する際、この画面に直接遷移する。 */
+  lastScreen: Screen;
   hasHydrated: boolean;
 
   setPlanStep: (step: PlanStep) => void;
@@ -69,6 +77,10 @@ interface ProjectState {
   setSlotAnswer: (path: string, slotId: string, choiceId: string) => void;
   resetProject: () => void;
   setHasHydrated: (value: boolean) => void;
+  setCurrentHearingId: (id: string | null) => void;
+  setLastScreen: (screen: Screen) => void;
+  /** 履歴一覧からヒアリングを再開する際、保存済みの行を丸ごとストアへ反映する。 */
+  hydrateFromHearing: (row: HearingRow) => void;
 }
 
 function sameHighlight(a: Highlight | null, b: Highlight | null): boolean {
@@ -93,6 +105,8 @@ const INITIAL_STATE = {
   slotAnswers: {},
   dataFlow: null,
   featureFlows: null,
+  currentHearingId: null as string | null,
+  lastScreen: "plan" as Screen,
 };
 
 export const useProjectStore = create<ProjectState>()(
@@ -209,17 +223,50 @@ export const useProjectStore = create<ProjectState>()(
       resetProject: () => set({ ...INITIAL_STATE }),
 
       setHasHydrated: (value) => set({ hasHydrated: value }),
+
+      setCurrentHearingId: (id) => set({ currentHearingId: id }),
+
+      setLastScreen: (screen) => set({ lastScreen: screen }),
+
+      hydrateFromHearing: (row) =>
+        set({
+          currentHearingId: row.id,
+          lastScreen: row.last_screen,
+          planStep: row.plan_step,
+          planText: row.plan_text,
+          projectTitle: row.title,
+          hearingReady: row.hearing_ready,
+          chatMessages: row.chat_messages,
+          stackProposal: row.stack_proposal,
+          stackQuiz: row.stack_quiz,
+          stackQuizSkipped: row.stack_quiz_skipped,
+          generatedFiles: row.generated_files,
+          chunkedFiles: row.chunked_files,
+          slotAnswers: row.slot_answers,
+          dataFlow: row.data_flow,
+          featureFlows: row.feature_flows,
+          highlighted: null,
+          pinned: false,
+          isPregenerating: false,
+          previewUrl: null,
+        }),
     }),
     {
       name: "project-state",
       storage: createJSONStorage(() => idbStorage),
-      version: 2,
+      version: 4,
       // v1(4ステップ構成)の永続化データを3ステップ構成へ変換する。
       migrate: (persisted, version) => {
         const state = persisted as Partial<ProjectState> & { planStep?: number };
         if (version < 2) {
           const old = state.planStep ?? 1;
           state.planStep = (old <= 2 ? 1 : old === 3 ? 2 : 3) as PlanStep;
+        }
+        if (version < 3) {
+          state.currentHearingId = null;
+        }
+        if (version < 4) {
+          state.lastScreen = "plan";
         }
         return state as ProjectState;
       },
@@ -238,6 +285,8 @@ export const useProjectStore = create<ProjectState>()(
         slotAnswers: state.slotAnswers,
         dataFlow: state.dataFlow,
         featureFlows: state.featureFlows,
+        currentHearingId: state.currentHearingId,
+        lastScreen: state.lastScreen,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

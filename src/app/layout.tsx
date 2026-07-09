@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { HeaderNav } from "@/components/layout/header-nav";
+import { AuthProvider } from "@/components/auth/auth-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -34,10 +35,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <TooltipProvider>
-          <HeaderNav />
-          <main className="flex flex-1 flex-col">{children}</main>
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <HeaderNav />
+            <main className="flex flex-1 flex-col">{children}</main>
+          </TooltipProvider>
+        </AuthProvider>
       </body>
     </html>
   );
