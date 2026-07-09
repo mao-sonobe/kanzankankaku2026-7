@@ -13,7 +13,7 @@ import { buildFileContent } from "@/lib/domain/chunk-code";
 import { SCAFFOLD_PATHS } from "@/lib/generated-app/scaffold";
 import { CodeEditor } from "./code-editor";
 import { BlockPalette, type RelatedNodeInfo } from "./block-palette";
-import { DataFlowView } from "./data-flow-view";
+import { FeatureMapView } from "./feature-map-view";
 import { FileTree } from "./file-tree";
 import { PlainCodeView } from "./plain-code-view";
 
@@ -137,12 +137,12 @@ export function LearnWorkspace() {
     <div className="flex flex-col gap-4">
       <Tabs value={mode} onValueChange={(v) => setMode(v as LearnMode)}>
         <TabsList>
-          <TabsTrigger value="flow">① データフロー解説</TabsTrigger>
+          <TabsTrigger value="flow">① 機能マップ</TabsTrigger>
           <TabsTrigger value="fill">② ブロック穴埋め</TabsTrigger>
         </TabsList>
       </Tabs>
 
-      {mode === "flow" && <DataFlowView onProceedToFill={() => setMode("fill")} />}
+      {mode === "flow" && <FeatureMapView onProceedToFill={() => setMode("fill")} />}
 
       {mode === "fill" && (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[200px_1fr_1fr]">

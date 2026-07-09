@@ -1,6 +1,6 @@
 import type {
   AIProvider,
-  AnalyzeDataFlowOptions,
+  AnalyzeFeatureMapOptions,
   ChatOptions,
   ChunkCodeOptions,
   ChunkCodeResult,
@@ -9,7 +9,7 @@ import type {
   ProposeTechStackOptions,
 } from "./types";
 import type { TechStackProposal } from "@/lib/domain/stack";
-import type { DataFlowResult } from "@/lib/domain/data-flow";
+import type { FeatureMapResult } from "@/lib/domain/feature-map";
 import type { AIProviderSettings } from "./types";
 
 /**
@@ -105,8 +105,8 @@ export class OpenAIAIProvider implements AIProvider {
     return data.result as ChunkCodeResult;
   }
 
-  async analyzeDataFlow(options: AnalyzeDataFlowOptions): Promise<DataFlowResult> {
-    const res = await fetch("/api/openai/data-flow", {
+  async analyzeFeatureMap(options: AnalyzeFeatureMapOptions): Promise<FeatureMapResult> {
+    const res = await fetch("/api/openai/feature-map", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -118,9 +118,9 @@ export class OpenAIAIProvider implements AIProvider {
     });
     const data = await res.json();
     if (!data.ok) {
-      throw new Error(data.error ?? "データフローの解析に失敗しました");
+      throw new Error(data.error ?? "機能マップの解析に失敗しました");
     }
-    return data.result as DataFlowResult;
+    return data.result as FeatureMapResult;
   }
 
   async checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }> {

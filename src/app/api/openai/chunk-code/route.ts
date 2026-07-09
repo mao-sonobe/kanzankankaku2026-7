@@ -23,10 +23,17 @@ const blankSchema = z.object({
   role: z.enum(BLOCK_ROLES),
   label: z.string().describe("この空欄が担う役割の短い日本語ラベル(例: 状態の初期化、増加処理)"),
   wrongAnswers: z
-    .array(z.string())
+    .array(
+      z.object({
+        code: z.string().describe("textと同程度の長さの、もっともらしいが誤ったコード片"),
+        reason: z
+          .string()
+          .describe("なぜこのコードでは動かない・間違っているかを初心者にも分かる1文で説明する"),
+      })
+    )
     .min(1)
     .max(3)
-    .describe("textと同程度の長さの、もっともらしいが誤ったコード片"),
+    .describe("もっともらしいが誤った選択肢(理由つき)"),
   relatedStackNodeId: z
     .string()
     .nullable()
@@ -91,7 +98,8 @@ export async function POST(req: NextRequest) {
             "- 空欄は細かすぎない単位にする(1文字や1トークンではなく、式・関数呼び出し・JSXの一部など意味のあるまとまり)。\n" +
             "- 空欄は必ず1行に収まる範囲にする(複数行にまたがる空欄は禁止)。\n" +
             "- roleは state(状態管理)/event-handler(イベントハンドラ)/api-fetch(APIフェッチ)/jsx(見た目)/logic(ロジック)/import(インポート)/style(スタイル)/other のいずれか。\n" +
-            "- wrongAnswersには、textと文字数が近い、もっともらしいが動作としては誤ったコード片を1〜3個含める。\n" +
+            "- wrongAnswersには、textと文字数が近い、もっともらしいが動作としては誤ったコード片を1〜3個含め、" +
+              "それぞれになぜ誤りか(なぜ動かない・意図と違うか)をreasonに初心者向けの1文で書く。\n" +
             "- explanationには、このコードが何をしていて、他の関数や技術とどうつながっているかを" +
               "初心者にも分かる1〜2文で説明する(例: 「fetchで取得したJSONをsetDataに渡し、画面に一覧表示します」)。\n" +
             "- 与えられた技術スタックの技術がこの空欄で実際に使われている場合は、relatedStackNodeIdフィールド(labelとは別の専用フィールド)にそのidをそのまま入れて、コードと技術スタックの対応関係を示すこと。\n" +

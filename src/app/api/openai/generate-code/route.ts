@@ -15,8 +15,11 @@ const generateCodeSchema = z.object({
   files: z
     .array(generatedFileSchema)
     .min(1)
-    .max(3)
-    .describe("生成するファイル一覧。app/page.jsを必ず含み、必要なら追加のコンポーネントファイルを含めてよい"),
+    .max(8)
+    .describe(
+      "生成するファイル一覧。app/page.jsを必ず含み、機能ごとに意味のある単位で" +
+        "app/components/配下にコンポーネントファイルを分割してよい"
+    ),
 });
 
 const CLIENT_ONLY_PATTERN = /\buse(State|Effect|Ref|Callback|Memo|Context)\b|on(Click|Change|Submit|Input|KeyDown|KeyUp|MouseEnter|MouseLeave)=/;
@@ -168,17 +171,20 @@ export async function POST(req: NextRequest) {
             "制約:\n" +
             "- 出力は素のJavaScript(TypeScriptではない)。ファイル名は app/page.js を必ず含める。\n" +
             "- Next.js 15 の App Router を使う。外部npmパッケージは一切使わない(next/reactのみ)。\n" +
+            "- 機能や役割ごとに意味のある単位でコンポーネントに分割し、app/components/配下に" +
+            "ファイルを作って app/page.js からimportする構成にしてよい(単純な企画なら1ファイルのままでもよい)。\n" +
             "- フックは必ず named import で書く(例: import { useState } from \"react\";)。React.useStateのような書き方は禁止。\n" +
-            "- app/globals.css は既にレイアウトで読み込み済みなので、page.js側でCSSファイルをimportしない。\n" +
+            "- app/globals.css は既にレイアウトで読み込み済みなので、CSSファイルをimportしない(page.js・コンポーネント共通)。\n" +
             "- 状態(useState)やイベントハンドラを使い、実際に画面上で操作できるインタラクティブな機能を実装する。\n" +
-            "- 状態を持つ場合は必ずファイル冒頭に \"use client\"; を1回だけ書く(関数の中で再度書かない)。\n" +
+            "- 状態やイベントハンドラを持つファイルは必ず冒頭に \"use client\"; を1回だけ書く(関数の中で再度書かない)。\n" +
+            "- コンポーネント間でstateを共有する場合はprops経由で受け渡す(親で状態を持ち、子にpropsで渡す)。\n" +
             "- スタイルは className と、既存の app/globals.css を前提にした簡単なインラインstyleで表現する(Tailwind等は使わない)。\n" +
             "- コードは初心者が読んでも理解できるよう、シンプルで分かりやすい実装にする。\n" +
             "- コメントやplaceholder(TODO等)は書かず、完全に動作するコードのみを出力する。",
       messages: [
         {
           role: "user",
-          content: `企画概要:\n${planSummary}\n\n技術スタック:\n${stackDescription}\n\nこの企画のコア機能を実装したapp/page.jsを生成してください。`,
+          content: `企画概要:\n${planSummary}\n\n技術スタック:\n${stackDescription}\n\nこの企画のコア機能を実装してください。機能が複数ある場合は意味のある単位でコンポーネントファイルに分割してください。`,
         },
       ],
     });
