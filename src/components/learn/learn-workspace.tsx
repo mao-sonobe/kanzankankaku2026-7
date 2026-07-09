@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 export function LearnWorkspace() {
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
   const setGeneratedFiles = useProjectStore((s) => s.setGeneratedFiles);
+  const setLastScreen = useProjectStore((s) => s.setLastScreen);
   const planText = useProjectStore((s) => s.planText);
   const isPregenerating = useProjectStore((s) => s.isPregenerating);
   const previewUrl = useProjectStore((s) => s.previewUrl);
@@ -50,6 +51,11 @@ export function LearnWorkspace() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const genStartedRef = useRef(false);
+
+  // 履歴からの再開先をこの画面にするため、到達時に記録する。
+  useEffect(() => {
+    setLastScreen("learn");
+  }, [setLastScreen]);
 
   // 旧「コード生成(/build)」ステップを廃止したため、コードが未生成ならこの画面で生成する。
   // クイズ中の先回し生成が使えればそれを使い、無ければAIプロバイダーで生成してスキャフォールドとマージする。

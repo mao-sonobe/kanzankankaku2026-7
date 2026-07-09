@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useProjectStore } from "@/lib/store/project-store";
+import { useAuthStore } from "@/lib/store/auth-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { StepChat } from "./step-chat";
 import { StepQuiz } from "./step-quiz";
 import { StepWiring } from "./step-wiring";
@@ -21,6 +24,11 @@ const TITLE_SYSTEM_PROMPT =
   "10文字前後で、名前だけを出力してください。引用符・説明・記号は不要です。";
 
 export function PlanWorkspace() {
+  const user = useAuthStore((s) => s.user);
+  const setLastScreen = useProjectStore((s) => s.setLastScreen);
+  useEffect(() => {
+    setLastScreen("plan");
+  }, [setLastScreen]);
   const planStep = useProjectStore((s) => s.planStep);
   const setPlanStep = useProjectStore((s) => s.setPlanStep);
   const planText = useProjectStore((s) => s.planText);
@@ -126,6 +134,18 @@ export function PlanWorkspace() {
 
   return (
     <div className="space-y-6">
+      {planStep === 1 && !user && (
+        <Alert>
+          <AlertTitle>ログインすると保存されます</AlertTitle>
+          <AlertDescription>
+            <Link href="/login" className="underline">
+              ログイン
+            </Link>
+            すると、このヒアリングの内容がいつでも見返せるように保存されます。
+          </AlertDescription>
+        </Alert>
+      )}
+
       {planStep === 1 && (
         <StepChat
           chatMessages={chatMessages}
