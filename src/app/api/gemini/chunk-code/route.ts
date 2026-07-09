@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { buildChunkedFile } from "@/lib/domain/chunk-code";
-import { getGoogleProvider } from "@/lib/ai/gemini-server";
+import { getGoogleProvider, retryGemini } from "@/lib/ai/gemini-server";
 import { toFriendlyGeminiError } from "@/lib/ai/friendly-error";
 
 const BLOCK_ROLES = [
@@ -78,7 +78,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const provider = getGoogleProvider();
-    const { object } = await generateObject({
+    const { object } = await retryGemini(() => generateObject({
       model: provider.chat(model),
       schema: chunkCodeSchema,
       system:
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
           content: `ファイル: ${path}\n\n\`\`\`\n${content}\n\`\`\`${stackContext}\n\nこのコードの穴埋め学習教材を作成してください。`,
         },
       ],
-    });
+    }));
 
     const chunked = buildChunkedFile(
       path,

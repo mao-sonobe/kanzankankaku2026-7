@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getGoogleProvider } from "@/lib/ai/gemini-server";
+import { getGoogleProvider, retryGemini } from "@/lib/ai/gemini-server";
 import { toFriendlyGeminiError } from "@/lib/ai/friendly-error";
 
 const generatedFileSchema = z.object({
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const provider = getGoogleProvider();
-    const { object } = await generateObject({
+    const { object } = await retryGemini(() => generateObject({
       model: provider.chat(model),
       schema: generateCodeSchema,
       system:
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
           content: `企画概要:\n${planSummary}\n\n技術スタック:\n${stackDescription}\n\nこの企画のコア機能を実装したapp/page.jsを生成してください。`,
         },
       ],
-    });
+    }));
     const normalized = object.files
       .filter((f) => f.content.trim().length > 0)
       .map((f) => {

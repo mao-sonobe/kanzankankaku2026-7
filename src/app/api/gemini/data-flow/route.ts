@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { validateDataFlowSpans } from "@/lib/domain/data-flow";
-import { getGoogleProvider } from "@/lib/ai/gemini-server";
+import { getGoogleProvider, retryGemini } from "@/lib/ai/gemini-server";
 import { toFriendlyGeminiError } from "@/lib/ai/friendly-error";
 
 const dataFlowSchema = z.object({
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const provider = getGoogleProvider();
-    const { object } = await generateObject({
+    const { object } = await retryGemini(() => generateObject({
       model: provider.chat(model),
       schema: dataFlowSchema,
       system:
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest) {
             `${filesText}\n\n各エッジがコード上のどこで実装されているかを特定してください。`,
         },
       ],
-    });
+    }));
 
     const spans = validateDataFlowSpans(usableFiles, stackProposal, object.spans);
     if (spans.length === 0) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getGoogleProvider } from "@/lib/ai/gemini-server";
+import { getGoogleProvider, retryGemini } from "@/lib/ai/gemini-server";
 import { toFriendlyGeminiError } from "@/lib/ai/friendly-error";
 
 const STACK_CATEGORIES = ["frontend", "backend", "infra", "data", "other"] as const;
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const provider = getGoogleProvider();
-    const { object } = await generateObject({
+    const { object } = await retryGemini(() => generateObject({
       model: provider.chat(model),
       schema: techStackSchema,
       system:
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
           content: `企画書:\n${planText}\n\n対話履歴:\n${historyText || "(なし)"}${regenerationContext}`,
         },
       ],
-    });
+    }));
     // 誤答の重複・正解との重複を除去(空になった場合はUI側がクイズなしで開示する)。
     const proposal = {
       ...object,
