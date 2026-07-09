@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getOpenAIProvider } from "@/lib/ai/openai-server";
+import { getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
 import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const generatedFileSchema = z.object({
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const provider = getOpenAIProvider();
-    const { object } = await generateObject({
+    const { object } = await retryOpenAI(() => generateObject({
       model: provider.chat(model),
       schema: generateCodeSchema,
       system:
@@ -187,8 +187,9 @@ export async function POST(req: NextRequest) {
           content: `企画概要:\n${planSummary}\n\n技術スタック:\n${stackDescription}\n\nこの企画のコア機能を実装してください。機能が複数ある場合は意味のある単位でコンポーネントファイルに分割してください。`,
         },
       ],
-    });
+    }));
     const normalized = object.files
+
       .filter((f) => f.content.trim().length > 0)
       .map((f) => {
         const path = normalizeFilePath(f.path);
