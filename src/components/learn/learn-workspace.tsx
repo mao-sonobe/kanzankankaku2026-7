@@ -122,7 +122,7 @@ export function LearnWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>生成されたコードがありません</CardTitle>
-          <CardDescription>先に②でコードを生成してください。</CardDescription>
+          <CardDescription>先に④でコードを生成してください。</CardDescription>
         </CardHeader>
         <CardContent>
           <Button nativeButton={false} render={<Link href="/build" />}>

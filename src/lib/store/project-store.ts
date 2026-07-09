@@ -11,11 +11,17 @@ export interface Highlight {
   id: string;
 }
 
-export type PlanStep = 1 | 2 | 3 | 4;
+/** ①企画チャット ②カードクイズ ③パイプライン学習 */
+export type PlanStep = 1 | 2 | 3;
 
 interface ProjectState {
   planStep: PlanStep;
+  /** 最初に入力された企画テキスト(tech-stack API互換用。会話全体はchatMessages) */
   planText: string;
+  /** AIが生成した企画名(チャット画面の上部に表示) */
+  projectTitle: string | null;
+  /** AIが「企画が十分まとまった」と判断したか([READY]検出) */
+  hearingReady: boolean;
   chatMessages: ChatMessage[];
   stackProposal: TechStackProposal | null;
   /** STEP3の4択クイズの回答状況(nodeId -> 状態) */
@@ -25,6 +31,8 @@ interface ProjectState {
   highlighted: Highlight | null;
   pinned: boolean;
   generatedFiles: GeneratedFile[];
+  /** クイズ中に裏でコード生成を走らせている間true(非永続) */
+  isPregenerating: boolean;
   previewUrl: string | null;
   chunkedFiles: Record<string, ChunkedFile>;
   slotAnswers: Record<string, Record<string, string>>;
@@ -34,6 +42,8 @@ interface ProjectState {
 
   setPlanStep: (step: PlanStep) => void;
   setPlanText: (text: string) => void;
+  setProjectTitle: (title: string | null) => void;
+  setHearingReady: (ready: boolean) => void;
   addChatMessage: (msg: ChatMessage) => void;
   updateLastAssistantMessage: (content: string) => void;
   setStackProposal: (
@@ -48,6 +58,7 @@ interface ProjectState {
   toggleClickHighlight: (highlight: Highlight) => void;
   resetStack: () => void;
   setGeneratedFiles: (files: GeneratedFile[]) => void;
+  setIsPregenerating: (value: boolean) => void;
   updateGeneratedFile: (path: string, content: string) => void;
   setPreviewUrl: (url: string | null) => void;
   setChunkedFile: (path: string, chunked: ChunkedFile) => void;
@@ -63,6 +74,8 @@ function sameHighlight(a: Highlight | null, b: Highlight | null): boolean {
 const INITIAL_STATE = {
   planStep: 1 as PlanStep,
   planText: "",
+  projectTitle: null as string | null,
+  hearingReady: false,
   chatMessages: [],
   stackProposal: null,
   stackQuiz: {} as StackQuizState,
@@ -70,6 +83,7 @@ const INITIAL_STATE = {
   highlighted: null,
   pinned: false,
   generatedFiles: [],
+  isPregenerating: false,
   previewUrl: null,
   chunkedFiles: {},
   slotAnswers: {},
@@ -85,6 +99,10 @@ export const useProjectStore = create<ProjectState>()(
       setPlanStep: (step) => set({ planStep: step }),
 
       setPlanText: (text) => set({ planText: text }),
+
+      setProjectTitle: (title) => set({ projectTitle: title }),
+
+      setHearingReady: (ready) => set({ hearingReady: ready }),
 
       addChatMessage: (msg) =>
         set((state) => ({ chatMessages: [...state.chatMessages, msg] })),
@@ -160,6 +178,8 @@ export const useProjectStore = create<ProjectState>()(
           dataFlow: null,
         }),
 
+      setIsPregenerating: (value) => set({ isPregenerating: value }),
+
       updateGeneratedFile: (path, content) =>
         set((state) => ({
           generatedFiles: state.generatedFiles.map((f) => (f.path === path ? { ...f, content } : f)),
@@ -185,10 +205,22 @@ export const useProjectStore = create<ProjectState>()(
     {
       name: "project-state",
       storage: createJSONStorage(() => idbStorage),
+      version: 2,
+      // v1(4ステップ構成)の永続化データを3ステップ構成へ変換する。
+      migrate: (persisted, version) => {
+        const state = persisted as Partial<ProjectState> & { planStep?: number };
+        if (version < 2) {
+          const old = state.planStep ?? 1;
+          state.planStep = (old <= 2 ? 1 : old === 3 ? 2 : 3) as PlanStep;
+        }
+        return state as ProjectState;
+      },
       // WebContainerのプレビューURL・ハイライト等の一時的なUI状態は保存しない。
       partialize: (state) => ({
         planStep: state.planStep,
         planText: state.planText,
+        projectTitle: state.projectTitle,
+        hearingReady: state.hearingReady,
         chatMessages: state.chatMessages,
         stackProposal: state.stackProposal,
         stackQuiz: state.stackQuiz,

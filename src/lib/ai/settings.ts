@@ -2,11 +2,11 @@ import type { AIProviderSettings } from "./types";
 
 const STORAGE_KEY = "ai-provider-settings";
 
-// Gemini APIが利用できない状況のため、ローカルLLM(Ollama)をデフォルトに戻す。
+// 公開版(Vercel)はGeminiが前提(Ollamaはlocalhost必須のため開発者向けオプション)。
 export const DEFAULT_AI_SETTINGS: AIProviderSettings = {
-  provider: "ollama",
+  provider: "gemini",
   endpoint: "http://localhost:11434",
-  model: "qwen3:8b",
+  model: "gemini-2.5-flash",
 };
 
 export const GEMINI_DEFAULT_MODEL = "gemini-2.5-flash";

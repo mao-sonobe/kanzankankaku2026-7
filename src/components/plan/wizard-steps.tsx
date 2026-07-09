@@ -1,48 +1,83 @@
 "use client";
 
-import { BookOpen, Ear, Lightbulb, MessageSquare } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { BookOpen, Ear, FileCode2, Lightbulb, MessageCircleQuestion } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { PlanStep } from "@/lib/store/project-store";
+import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
 
-const STEPS: { step: PlanStep; icon: typeof BookOpen; label: string }[] = [
-  { step: 1, icon: BookOpen, label: "作りたいものを入力" },
-  { step: 2, icon: Ear, label: "AIヒアリング" },
-  { step: 3, icon: Lightbulb, label: "技術スタックの提案" },
-  { step: 4, icon: MessageSquare, label: "技術スタックの解説" },
+// ①企画チャット ②カードクイズ ③パイプライン学習 ④コード生成(/build) ⑤コード理解(/learn)
+const STEPS: {
+  icon: typeof BookOpen;
+  label: string;
+  planStep?: PlanStep;
+  href?: string;
+}[] = [
+  { icon: Ear, label: "企画チャット", planStep: 1 },
+  { icon: BookOpen, label: "技術クイズ", planStep: 2 },
+  { icon: MessageCircleQuestion, label: "パイプライン学習", planStep: 3 },
+  { icon: FileCode2, label: "コード生成", href: "/build" },
+  { icon: Lightbulb, label: "コード理解", href: "/learn" },
 ];
 
-export function WizardSteps({
-  current,
-  maxReached,
-  onSelect,
-}: {
-  current: PlanStep;
-  maxReached: PlanStep;
-  onSelect: (step: PlanStep) => void;
-}) {
+/**
+ * ヘッダー中央に置く進捗シェブロン。plan配下ではストアのplanStepで、
+ * /build・/learnではpathnameで現在地を判定する。
+ */
+export function WizardSteps() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const planStep = useProjectStore((s) => s.planStep);
+  const stackProposal = useProjectStore((s) => s.stackProposal);
+  const generatedFiles = useProjectStore((s) => s.generatedFiles);
+
+  const onPlan = pathname === "/plan";
+  const maxPlanReached: PlanStep = stackProposal ? 3 : 1;
+  const hasCode = generatedFiles.length > 0;
+
+  function isActive(planStepOf?: PlanStep, href?: string): boolean {
+    if (href) return pathname === href;
+    if (!onPlan) return false;
+    return planStepOf === planStep;
+  }
+
+  function isReachable(planStepOf?: PlanStep, href?: string): boolean {
+    if (planStepOf !== undefined) return planStepOf <= maxPlanReached;
+    if (href === "/build") return !!stackProposal;
+    if (href === "/learn") return hasCode;
+    return false;
+  }
+
   return (
     <div className="flex">
-      {STEPS.map(({ step, icon: Icon, label }, i) => {
-        const active = step === current;
-        const reachable = step <= maxReached;
+      {STEPS.map(({ icon: Icon, label, planStep: ps, href }, i) => {
+        const active = isActive(ps, href);
+        const reachable = isReachable(ps, href);
         return (
           <button
-            key={step}
+            key={label}
             type="button"
             title={label}
             aria-label={label}
             aria-current={active ? "step" : undefined}
             disabled={!reachable}
-            onClick={() => reachable && onSelect(step)}
+            onClick={() => {
+              if (!reachable) return;
+              if (ps !== undefined) {
+                if (onPlan) useProjectStore.getState().setPlanStep(ps);
+                else router.push("/plan");
+              } else if (href) {
+                router.push(href);
+              }
+            }}
             className={cn(
-              "relative flex h-12 w-20 items-center justify-center border text-foreground transition-colors",
-              i > 0 && "-ml-2.5",
+              "relative flex h-11 w-16 items-center justify-center border text-foreground transition-colors",
+              i > 0 && "-ml-2",
               reachable ? "cursor-pointer hover:bg-muted" : "cursor-not-allowed opacity-40",
               active ? "z-10 border-2" : "border-foreground/70 bg-background"
             )}
             style={{
               clipPath: "polygon(0 0, 82% 0, 100% 50%, 82% 100%, 0 100%, 18% 50%)",
-              borderColor: active ? "var(--brand-blue)" : undefined,
+              borderColor: active ? "var(--brand-pink)" : undefined,
               background: active
                 ? "linear-gradient(90deg, color-mix(in oklab, var(--brand-blue) 15%, white), color-mix(in oklab, var(--brand-pink) 15%, white))"
                 : undefined,

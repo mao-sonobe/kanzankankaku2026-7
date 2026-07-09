@@ -31,6 +31,7 @@ export function BuildWorkspace() {
   const stackProposal = useProjectStore((s) => s.stackProposal);
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
   const setGeneratedFiles = useProjectStore((s) => s.setGeneratedFiles);
+  const isPregenerating = useProjectStore((s) => s.isPregenerating);
   const previewUrl = useProjectStore((s) => s.previewUrl);
   const setPreviewUrl = useProjectStore((s) => s.setPreviewUrl);
 
@@ -112,6 +113,8 @@ export function BuildWorkspace() {
   // コード生成〜WebContainer起動は裏側で自動的に走らせ、完了したら③のコード理解画面へ自動遷移する。
   useEffect(() => {
     if (!stackProposal || startedRef.current) return;
+    // クイズ中の先回し生成がまだ走っている場合は、二重生成を避けて完了(generatedFiles反映)を待つ。
+    if (isPregenerating && generatedFiles.length === 0) return;
     startedRef.current = true;
     if (previewUrl) {
       router.replace("/learn");
@@ -121,7 +124,7 @@ export function BuildWorkspace() {
       void handleGenerateAndRun();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stackProposal, previewUrl, generatedFiles, router]);
+  }, [stackProposal, previewUrl, generatedFiles, isPregenerating, router]);
 
   useEffect(() => {
     if (phase === "ready" && previewUrl) {
