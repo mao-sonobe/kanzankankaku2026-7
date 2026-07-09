@@ -2,7 +2,7 @@ import type { AIProviderSettings } from "./types";
 
 const STORAGE_KEY = "ai-provider-settings";
 
-// Web公開版はGeminiが前提(Ollamaはlocalhost必須のため開発者向けオプション)。
+// 公開版(Vercel)はGeminiが前提(Ollamaはlocalhost必須のため開発者向けオプション)。
 export const DEFAULT_AI_SETTINGS: AIProviderSettings = {
   provider: "gemini",
   endpoint: "http://localhost:11434",

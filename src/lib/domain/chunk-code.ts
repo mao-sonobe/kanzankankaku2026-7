@@ -8,6 +8,8 @@ export interface RawBlank {
   wrongAnswers: string[];
   /** この空欄が関わる技術スタックノードのid(任意) */
   relatedStackNodeId?: string;
+  /** 正解時に表示する説明文(任意) */
+  explanation?: string;
 }
 
 function shuffle<T>(items: T[]): T[] {
@@ -28,6 +30,7 @@ export function buildChunkedFile(
   path: string,
   content: string,
   blanks: RawBlank[],
+  summary: string,
   validNodeIds?: Set<string>
 ): ChunkedFile {
   // CodeMirrorのウィジェット描画を単純にするため、複数行にまたがる空欄は除外する。
@@ -65,6 +68,7 @@ export function buildChunkedFile(
       label: m.item.label,
       choices,
       ...(relatedStackNodeId ? { relatedStackNodeId } : {}),
+      ...(m.item.explanation ? { explanation: m.item.explanation } : {}),
     };
     segments.push({ type: "slot", slot });
     cursor = m.end;
@@ -74,7 +78,7 @@ export function buildChunkedFile(
     segments.push({ type: "text", content: content.slice(cursor) });
   }
 
-  return { path, segments };
+  return { path, summary, segments };
 }
 
 /** 未回答のスロットに入れる、構文的に無害なプレースホルダー。 */

@@ -29,7 +29,11 @@ export function getScaffoldFiles(): GeneratedFile[] {
             start: "next start",
           },
           dependencies: {
-            next: "15.5.20",
+            // Next.js 15.5.x はWebContainers上で"Expected workUnitAsyncStorage to have a store"
+            // という内部invariantエラーで/がクラッシュする既知の不具合がある
+            // (https://github.com/vercel/next.js/issues/84026)。
+            // 15.4系(15.4.1で動作確認済み)に固定して回避する。
+            next: "15.4.11",
             react: "19.2.4",
             "react-dom": "19.2.4",
           },

@@ -87,8 +87,10 @@ function ensureNamedHookImports(content: string): string {
 
 /** ローカルLLMが関数本体の中に"use client"の裸の(引用符なし)複製を紛れ込ませることがあるため取り除く。 */
 function stripStrayUseClientStatements(content: string): string {
+  // 引用符なしの"use client;"は(先頭行であっても)常に無効なので取り除く。
+  // 正しい引用符付きディレクティブはensureUseClientDirectiveが別途付与する。
   const lines = content.split("\n");
-  return lines.filter((line, i) => !(i > 0 && /^\s*use client;?\s*$/.test(line))).join("\n");
+  return lines.filter((line) => !/^\s*use client;?\s*$/.test(line)).join("\n");
 }
 
 /** app/page.js等でグローバルCSSを再importするとNext.jsがビルドエラーになるため取り除く(globals.cssはlayout.jsで読み込み済み)。 */
@@ -118,11 +120,17 @@ function stripMarkdownFence(content: string): string {
 
 /** ローカルLLMは "./page.js" や "page.js" のようにapp/配下から外れたパスを返すことがあるため矯正する。 */
 function normalizeFilePath(path: string): string {
-  const cleaned = path.trim().replace(/^\.\/+/, "").replace(/^\/+/, "");
+  const cleaned = path
+    .trim()
+    .replace(/^\.\/+/, "")
+    .replace(/^\/+/, "")
+    .replace(/^src\/+/, "");
   const baseName = cleaned.split("/").pop() ?? cleaned;
   const isRouteFile = /^(page|layout)\.(js|jsx|ts|tsx)$/.test(baseName);
   if (isRouteFile && !cleaned.startsWith("app/")) {
-    return `app/${baseName}`;
+    // ネストしたフォルダ構造(例: counter/page.js)は保持したままapp/配下に移す。
+    // basenameだけを使うと、異なるフォルダの複数ファイルが同じapp/page.jsに衝突しうる。
+    return `app/${cleaned}`;
   }
   return cleaned;
 }
@@ -160,6 +168,8 @@ export async function POST(req: NextRequest) {
       model: provider.chatModel(model),
       schema: generateCodeSchema,
       allowSystemInMessages: true,
+      // Qwen3等の推論モデルはデフォルトで長い思考過程を出力し遅くなるため無効化する。
+      providerOptions: { ollama: { reasoningEffort: "none" } },
       messages: [
         {
           role: "system",
@@ -183,12 +193,15 @@ export async function POST(req: NextRequest) {
         },
       ],
     });
-    const files = object.files
+    const normalized = object.files
       .filter((f) => f.content.trim().length > 0)
       .map((f) => {
         const path = normalizeFilePath(f.path);
         return { path, content: postProcessFile(path, f.content) };
       });
+    // 正規化後にパスが衝突した場合(異なる意図のファイルが同じパスになった場合)は
+    // 後勝ちで一意化し、無警告の上書きではなく決定的な結果にする。
+    const files = Array.from(new Map(normalized.map((f) => [f.path, f])).values());
     if (files.length === 0) {
       return NextResponse.json(
         { ok: false, error: "有効なコードが生成されませんでした。もう一度お試しください。" },

@@ -33,6 +33,7 @@ export function BlockPalette({
   }
 
   const colors = BLOCK_ROLE_COLORS[slot.role];
+  const isCorrect = slot.choices.find((c) => c.id === selectedChoiceId)?.isCorrect ?? false;
 
   return (
     <div className="space-y-3">
@@ -60,6 +61,14 @@ export function BlockPalette({
           </div>
         )}
       </div>
+
+      {isCorrect && slot.explanation && (
+        <div className={cn("rounded-md border-l-4 p-3 text-sm", colors.bg, colors.text, colors.border)}>
+          <p className="mb-1 text-xs font-semibold opacity-70">✓ 正解！このコードの役割</p>
+          <p>{slot.explanation}</p>
+        </div>
+      )}
+
       <div className="flex flex-col gap-2">
         {slot.choices.map((choice) => (
           <button

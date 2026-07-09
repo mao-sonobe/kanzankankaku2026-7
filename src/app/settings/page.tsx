@@ -122,7 +122,7 @@ export default function SettingsPage() {
               id="model"
               value={model}
               onChange={(e) => setModel(e.target.value)}
-              placeholder={provider === "gemini" ? GEMINI_DEFAULT_MODEL : "qwen2.5:3b"}
+              placeholder={provider === "gemini" ? GEMINI_DEFAULT_MODEL : "qwen3:8b"}
             />
           </div>
 

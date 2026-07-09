@@ -65,11 +65,15 @@ export interface CodeBlockSlot {
   choices: CodeBlockChoice[];
   /** この空欄が関わる技術スタックノードのid(STEP3の提案との紐付け。任意) */
   relatedStackNodeId?: string;
+  /** 正解した際に表示する、このコードが何をしていて何とつながっているかの説明文(1〜2文) */
+  explanation?: string;
 }
 
 /** チャンク化されたファイル: ゴーストコード + 空欄スロットの並び */
 export interface ChunkedFile {
   path: string;
+  /** このファイルで何が重要かを2〜3文で説明した概要 */
+  summary: string;
   /** ファイル内容をスロットとプレーンテキストの断片に分解したもの（順序通りに連結すると元コードに戻る） */
   segments: (
     | { type: "text"; content: string }

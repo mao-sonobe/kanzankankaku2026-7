@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +15,18 @@ import { getScaffoldFiles } from "@/lib/generated-app/scaffold";
 
 type Phase = "idle" | "generating" | "booting" | "installing" | "running" | "ready" | "error";
 
+const PHASE_LABEL: Record<Phase, string> = {
+  idle: "準備しています…",
+  generating: "AIがコードを生成しています…",
+  booting: "実行環境を起動しています…",
+  installing: "依存関係をインストールしています…",
+  running: "アプリを起動しています…",
+  ready: "完了しました。移動します…",
+  error: "エラーが発生しました",
+};
+
 export function BuildWorkspace() {
+  const router = useRouter();
   const planText = useProjectStore((s) => s.planText);
   const stackProposal = useProjectStore((s) => s.stackProposal);
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
@@ -23,15 +35,27 @@ export function BuildWorkspace() {
   const previewUrl = useProjectStore((s) => s.previewUrl);
   const setPreviewUrl = useProjectStore((s) => s.setPreviewUrl);
 
-  const [phase, setPhase] = useState<Phase>(generatedFiles.length > 0 ? "ready" : "idle");
+  const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const startedRef = useRef(false);
 
-  function appendLog(line: string) {
-    const cleaned = line.replace(/\x1b\[[0-9;]*[A-Za-z]/g, "").replace(/[\r\n]+/g, "\n").trim();
-    if (!cleaned) return;
-    setLogs((prev) => [...prev.slice(-300), cleaned]);
+  function appendLog(raw: string) {
+    // npmの進捗表示に含まれるANSI制御シーケンス(CSI/OSC)やスピナー用の点字文字(⠋⠙⠹…)を
+    // 取り除かないと、謎の記号だけが並んだログになってしまう。
+    const lines = raw
+      .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
+      .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
+      .replace(/\x1b[()][A-Za-z0-9]/g, "")
+      .replace(/\x1b/g, "")
+      .replace(/[⠀-⣿]/g, "")
+      .split(/\r\n|\r|\n/)
+      .map((l) => l.trim())
+      .filter(Boolean);
+    if (lines.length === 0) return;
+    setLogs((prev) => [...prev, ...lines].slice(-300));
     queueMicrotask(() => logsEndRef.current?.scrollIntoView({ block: "end" }));
   }
 
@@ -85,16 +109,28 @@ export function BuildWorkspace() {
     }
   }
 
-  // クイズ中に先回し生成されたコードがある場合、/build到着時に自動で起動する。
-  const autoStarted = useRef(false);
+  // 生成されたコードの全文をここで見せてしまうと、③の穴埋め学習の前に答えを見せることになるため、
+  // コード生成〜WebContainer起動は裏側で自動的に走らせ、完了したら③のコード理解画面へ自動遷移する。
   useEffect(() => {
-    if (autoStarted.current || previewUrl) return;
-    if (generatedFiles.length > 0 && (phase === "idle" || phase === "ready")) {
-      autoStarted.current = true;
+    if (!stackProposal || startedRef.current) return;
+    // クイズ中の先回し生成がまだ走っている場合は、二重生成を避けて完了(generatedFiles反映)を待つ。
+    if (isPregenerating && generatedFiles.length === 0) return;
+    startedRef.current = true;
+    if (previewUrl) {
+      router.replace("/learn");
+    } else if (generatedFiles.length > 0) {
       void handleResume();
+    } else {
+      void handleGenerateAndRun();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [generatedFiles, previewUrl, phase]);
+  }, [stackProposal, previewUrl, generatedFiles, isPregenerating, router]);
+
+  useEffect(() => {
+    if (phase === "ready" && previewUrl) {
+      router.replace("/learn");
+    }
+  }, [phase, previewUrl, router]);
 
   if (!stackProposal) {
     return (
@@ -114,16 +150,16 @@ export function BuildWorkspace() {
     );
   }
 
-  const isBusy = phase === "generating" || phase === "booting" || phase === "installing";
-
   return (
     <div className="flex flex-col gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>確定した技術スタック</CardTitle>
-          <CardDescription>この内容をもとにAIがコードを生成します。</CardDescription>
+          <CardTitle>アプリを準備しています</CardTitle>
+          <CardDescription>
+            AIがコードを生成し、実行環境を起動しています。完了すると自動的にコード理解画面に移動します(数分かかることがあります)。
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
             {stackProposal.nodes.map((node) => (
               <Badge key={node.id} variant="outline" className="gap-1.5">
@@ -132,92 +168,45 @@ export function BuildWorkspace() {
               </Badge>
             ))}
           </div>
-          {isPregenerating && generatedFiles.length === 0 && (
-            <p className="text-sm text-muted-foreground">
-              クイズ中に生成したコードを準備しています…
-            </p>
-          )}
-          <div className="flex gap-2">
-            <Button onClick={handleGenerateAndRun} disabled={isBusy}>
-              {phase === "generating" && "コードを生成中…"}
-              {phase === "booting" && "WebContainerを起動中…"}
-              {phase === "installing" && "依存関係をインストール中…"}
-              {(phase === "idle" || phase === "ready" || phase === "error") &&
-                (generatedFiles.length > 0 ? "再生成して起動する" : "コードを生成して起動する")}
-              {phase === "running" && "起動中…"}
-            </Button>
-            {phase === "idle" && generatedFiles.length > 0 && !previewUrl && (
-              <Button variant="secondary" onClick={handleResume} disabled={isBusy}>
-                保存されたコードでプレビューを再開する
-              </Button>
+
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            {phase !== "error" && phase !== "ready" && (
+              <span className="size-2 animate-pulse rounded-full bg-primary" />
             )}
+            {PHASE_LABEL[phase]}
           </div>
 
-          {error && (
-            <Alert variant="destructive">
-              <AlertTitle>エラーが発生しました</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+          {phase === "error" && (
+            <>
+              <Alert variant="destructive">
+                <AlertTitle>エラーが発生しました</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+              <Button onClick={() => void handleGenerateAndRun()}>もう一度試す</Button>
+            </>
           )}
         </CardContent>
       </Card>
 
-      {generatedFiles.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>生成されたファイル</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              {generatedFiles.map((file) => (
-                <li key={file.path}>
-                  <p className="font-mono text-xs text-muted-foreground">{file.path}</p>
-                  <pre className="mt-1 max-h-56 overflow-auto rounded-md border bg-muted p-3 text-xs">
-                    {file.content}
-                  </pre>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
       {logs.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>実行ログ</CardTitle>
+            <CardTitle className="flex items-center justify-between">
+              <span>実行ログ</span>
+              <Button variant="ghost" size="sm" onClick={() => setShowLogs((v) => !v)}>
+                {showLogs ? "隠す" : "詳細を表示"}
+              </Button>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <pre className="max-h-48 overflow-auto rounded-md border bg-black p-3 text-xs text-green-400">
-              {logs.join("\n")}
-              <div ref={logsEndRef} />
-            </pre>
-          </CardContent>
+          {showLogs && (
+            <CardContent>
+              <pre className="max-h-48 overflow-auto rounded-md border bg-black p-3 text-xs text-green-400">
+                {logs.join("\n")}
+                <div ref={logsEndRef} />
+              </pre>
+            </CardContent>
+          )}
         </Card>
-      )}
-
-      {previewUrl && (
-        <Card>
-          <CardHeader>
-            <CardTitle>ライブプレビュー</CardTitle>
-            <CardDescription>{previewUrl}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <iframe
-              src={previewUrl}
-              className="h-[600px] w-full rounded-md border bg-white"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-            />
-          </CardContent>
-        </Card>
-      )}
-
-      {previewUrl && (
-        <div className="flex justify-end">
-          <Button size="lg" nativeButton={false} render={<Link href="/learn" />}>
-            次へ: コードを理解する →
-          </Button>
-        </div>
       )}
     </div>
   );
