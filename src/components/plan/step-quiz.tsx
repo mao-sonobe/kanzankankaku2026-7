@@ -117,8 +117,8 @@ export function StepQuiz({
       )}
 
       <div className="flex h-full">
-        {/* 左: 回答履歴(画面左端に密着・ゲームカード風) */}
-        <div className="w-[120px] flex-none pt-4">
+        {/* 左: 回答履歴(画面左端に密着・ゲームカード風)。ホバー展開が図の上に来るようz付与 */}
+        <div className="relative z-20 w-[120px] flex-none pt-4">
           <QuizHistory
             items={answeredItems}
             proposal={proposal}

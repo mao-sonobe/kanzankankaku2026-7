@@ -114,34 +114,14 @@ export function QuizHistory({
         return (
           <div
             key={node.id}
-            className="relative"
+            className={cn("relative", hovered && "z-40")}
             onMouseEnter={() => onHoverNode(node.id)}
             onMouseLeave={() => onHoverNode(null)}
           >
-            {/* 通常時: 小さいコンパクトなカード(ゲームの札風)。左端が少し見切れる。 */}
-            <div className="overflow-hidden">
-              <div
-                className={cn(
-                  "-ml-4 flex w-[calc(100%+1rem)] items-center gap-1 rounded-lg border border-pink-200 bg-pink-100 py-1.5 pl-5 pr-2 shadow-sm transition-opacity",
-                  hovered && "opacity-0"
-                )}
-              >
-                <TechIcon name={displayTech} size={13} />
-                <span className="truncate text-xs font-bold">{displayTech}</span>
-                <span className="ml-auto flex-none">
-                  <ResultMark correct={!isWrong} />
-                </span>
-              </div>
-            </div>
-
-            {/* ホバー時: 大きく展開(クリップ外なので全文+やり取りデータが見える) */}
-            {hovered && (
-              <div
-                className={cn(
-                  "absolute left-0 top-0 z-40 flex gap-2",
-                  isWrong ? "w-[440px]" : "w-[240px]"
-                )}
-              >
+            {hovered ? (
+              /* ホバー時: その場で大きく展開。縦に伸びるので下のカードは押し下げられてズレる
+                 (覆い隠さない)。幅は右方向へ図の上にせり出す。 */
+              <div className={cn("flex gap-2", isWrong ? "w-[440px]" : "w-[240px]")}>
                 {isWrong ? (
                   <>
                     <DetailCard
@@ -159,6 +139,17 @@ export function QuizHistory({
                 ) : (
                   <DetailCard tech={node.label} correct text={node.description} flows={flows} />
                 )}
+              </div>
+            ) : (
+              /* 通常時: 小さいコンパクトなカード(ゲームの札風)。左端が少し見切れる。 */
+              <div className="overflow-hidden">
+                <div className="-ml-4 flex w-[calc(100%+1rem)] items-center gap-1 rounded-lg border border-pink-200 bg-pink-100 py-1.5 pl-5 pr-2 shadow-sm">
+                  <TechIcon name={displayTech} size={13} />
+                  <span className="truncate text-xs font-bold">{displayTech}</span>
+                  <span className="ml-auto flex-none">
+                    <ResultMark correct={!isWrong} />
+                  </span>
+                </div>
               </div>
             )}
           </div>
