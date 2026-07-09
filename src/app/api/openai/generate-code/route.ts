@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
+import { resolveModel, getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
 import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const generatedFileSchema = z.object({
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
   try {
     const provider = getOpenAIProvider();
     const { object } = await retryOpenAI(() => generateObject({
-      model: provider.chat(model),
+      model: provider.chat(resolveModel(model)),
       schema: generateCodeSchema,
       system:
             "あなたはNext.js(App Router)のシニアエンジニアです。" +

@@ -11,8 +11,11 @@ export async function POST() {
     );
   }
 
+  // OPENAI_BASE_URL 設定時はそのOpenAI互換エンドポイント(Qwen等)に対して疎通確認する。
+  const baseUrl = (process.env.OPENAI_BASE_URL || "https://api.openai.com/v1").replace(/\/$/, "");
+
   try {
-    const res = await fetch("https://api.openai.com/v1/models", {
+    const res = await fetch(`${baseUrl}/models`, {
       method: "GET",
       headers: { Authorization: `Bearer ${apiKey}` },
       signal: AbortSignal.timeout(8000),

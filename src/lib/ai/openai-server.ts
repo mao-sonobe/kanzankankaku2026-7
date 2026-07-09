@@ -2,16 +2,28 @@ import { createOpenAI } from "@ai-sdk/openai";
 
 /**
  * OpenAI(ChatGPT) APIキーはサーバー側の環境変数(.env.local)にのみ保持し、クライアントには渡さない。
- * Ollama版と異なりエンドポイントはユーザー入力ではなく固定のOpenAI APIを使う。
+ *
+ * `OPENAI_BASE_URL` を設定すると、OpenAI互換の任意のエンドポイントに切り替えられる。
+ * これにより、無料のQwen(例: ローカルOllamaの http://localhost:11434/v1、OpenRouterや
+ * DashScopeのOpenAI互換API)をテスト用途で使い、最終的に本物のChatGPT APIへ差し替えられる。
  */
 export function getOpenAIProvider() {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     throw new Error(
-      "OPENAI_API_KEYが設定されていません。.env.localに設定してから`npm run dev`を再起動してください。"
+      "OPENAI_API_KEYが設定されていません。.env.localに設定してから`npm run dev`を再起動してください。" +
+        "(Qwen等のOpenAI互換エンドポイントを使う場合はダミー値でも可)"
     );
   }
-  return createOpenAI({ apiKey });
+  return createOpenAI({ apiKey, baseURL: process.env.OPENAI_BASE_URL || undefined });
+}
+
+/**
+ * 実際に使うモデル名。`OPENAI_MODEL` があればサーバー側で強制的に上書きする
+ * (Qwen等の互換エンドポイントへ向ける際、クライアント設定のモデル名と不一致でも動くように)。
+ */
+export function resolveModel(clientModel: string): string {
+  return process.env.OPENAI_MODEL || clientModel;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

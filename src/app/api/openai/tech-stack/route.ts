@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
+import { resolveModel, getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
 import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const STACK_CATEGORIES = ["frontend", "backend", "infra", "data", "other"] as const;
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   try {
     const provider = getOpenAIProvider();
     const { object } = await retryOpenAI(() => generateObject({
-      model: provider.chat(model),
+      model: provider.chat(resolveModel(model)),
       schema: techStackSchema,
       system:
             "あなたは初心者エンジニアの開発を支援するAIアーキテクトです。" +

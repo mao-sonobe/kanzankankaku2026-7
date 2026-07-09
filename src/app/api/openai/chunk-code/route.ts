@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { buildChunkedFile } from "@/lib/domain/chunk-code";
-import { getOpenAIProvider } from "@/lib/ai/openai-server";
+import { resolveModel, getOpenAIProvider } from "@/lib/ai/openai-server";
 import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const BLOCK_ROLES = [
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
   try {
     const provider = getOpenAIProvider();
     const { object } = await generateObject({
-      model: provider.chat(model),
+      model: provider.chat(resolveModel(model)),
       schema: chunkCodeSchema,
       system:
             "あなたは初心者エンジニア向けの穴埋め学習教材を作るコーチです。" +

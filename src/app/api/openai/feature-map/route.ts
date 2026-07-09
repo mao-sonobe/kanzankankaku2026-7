@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { validateFeatureSpans } from "@/lib/domain/feature-map";
-import { getOpenAIProvider } from "@/lib/ai/openai-server";
+import { resolveModel, getOpenAIProvider } from "@/lib/ai/openai-server";
 import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 const featureMapSchema = z.object({
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   try {
     const provider = getOpenAIProvider();
     const { object } = await generateObject({
-      model: provider.chat(model),
+      model: provider.chat(resolveModel(model)),
       schema: featureMapSchema,
       system:
         "あなたは初心者エンジニアにコードの構造を教えるコーチです。" +

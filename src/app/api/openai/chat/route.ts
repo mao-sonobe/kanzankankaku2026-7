@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { generateText } from "ai";
-import { getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
+import { resolveModel, getOpenAIProvider, retryOpenAI } from "@/lib/ai/openai-server";
 import { toFriendlyOpenAIError } from "@/lib/ai/friendly-error";
 
 export async function POST(req: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const text = await retryOpenAI(
       async () => {
         const { text } = await generateText({
-          model: provider.chat(model),
+          model: provider.chat(resolveModel(model)),
           system,
           messages: chatMessages,
         });
