@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -9,7 +8,7 @@ import { useProjectStore } from "@/lib/store/project-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
 import { getExecutionProvider } from "@/lib/execution/webcontainer-provider";
 import { buildFileContent } from "@/lib/domain/chunk-code";
-import { SCAFFOLD_PATHS } from "@/lib/generated-app/scaffold";
+import { SCAFFOLD_PATHS, getScaffoldFiles } from "@/lib/generated-app/scaffold";
 import { filePathsForFeature, locateFeatureRangesInChunked } from "@/lib/domain/feature-map";
 import { featureColor } from "@/lib/domain/feature-colors";
 import { CodeEditor } from "./code-editor";
@@ -20,6 +19,9 @@ import { cn } from "@/lib/utils";
 
 export function LearnWorkspace() {
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
+  const setGeneratedFiles = useProjectStore((s) => s.setGeneratedFiles);
+  const planText = useProjectStore((s) => s.planText);
+  const isPregenerating = useProjectStore((s) => s.isPregenerating);
   const previewUrl = useProjectStore((s) => s.previewUrl);
   const chunkedFiles = useProjectStore((s) => s.chunkedFiles);
   const setChunkedFile = useProjectStore((s) => s.setChunkedFile);
@@ -45,6 +47,40 @@ export function LearnWorkspace() {
   const [activeFeatureId, setActiveFeatureId] = useState<string | null>(null);
   const [isAnalyzingFeatures, setIsAnalyzingFeatures] = useState(false);
   const [analyzeFeatureError, setAnalyzeFeatureError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const genStartedRef = useRef(false);
+
+  // 旧「コード生成(/build)」ステップを廃止したため、コードが未生成ならこの画面で生成する。
+  // クイズ中の先回し生成が使えればそれを使い、無ければAIプロバイダーで生成してスキャフォールドとマージする。
+  async function generateCode() {
+    if (!stackProposal || isGenerating) return;
+    setGenerateError(null);
+    setIsGenerating(true);
+    try {
+      const result = await getAIProvider().generateCode({
+        planSummary: planText,
+        stackNodes: stackProposal.nodes,
+      });
+      const scaffold = getScaffoldFiles();
+      const aiPaths = new Set(result.files.map((f) => f.path));
+      const merged = [...scaffold.filter((f) => !aiPaths.has(f.path)), ...result.files];
+      setGeneratedFiles(merged);
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : "コード生成に失敗しました");
+    } finally {
+      setIsGenerating(false);
+    }
+  }
+
+  // 到着時にコードが無く、先回し生成も走っていなければ自動で生成を開始する。
+  useEffect(() => {
+    if (genStartedRef.current) return;
+    if (generatedFiles.length > 0 || isPregenerating || !stackProposal) return;
+    genStartedRef.current = true;
+    void generateCode();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [generatedFiles.length, isPregenerating, stackProposal]);
 
   const nodeById = useMemo(
     () => new Map(stackProposal?.nodes.map((n) => [n.id, n]) ?? []),
@@ -172,16 +208,33 @@ export function LearnWorkspace() {
   }
 
   if (generatedFiles.length === 0) {
+    const preparing = isPregenerating || isGenerating;
     return (
       <Card>
         <CardHeader>
-          <CardTitle>生成されたコードがありません</CardTitle>
-          <CardDescription>先に④でコードを生成してください。</CardDescription>
+          <CardTitle>コードを準備しています</CardTitle>
+          <CardDescription>
+            {preparing
+              ? "企画と技術スタックからコードを生成しています…"
+              : stackProposal
+                ? "コードがまだありません。生成してから穴埋め学習を始めましょう。"
+                : "先に①〜③(企画チャット・技術クイズ・配線パズル)を進めてください。"}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button nativeButton={false} render={<Link href="/build" />}>
-            コード生成に戻る
-          </Button>
+        <CardContent className="space-y-3">
+          {generateError && (
+            <Alert variant="destructive">
+              <AlertTitle>コード生成に失敗しました</AlertTitle>
+              <AlertDescription>{generateError}</AlertDescription>
+            </Alert>
+          )}
+          {preparing ? (
+            <p className="text-sm text-muted-foreground">しばらくお待ちください…</p>
+          ) : stackProposal ? (
+            <Button onClick={() => void generateCode()} disabled={isGenerating}>
+              コードを生成する
+            </Button>
+          ) : null}
         </CardContent>
       </Card>
     );
@@ -378,7 +431,7 @@ export function LearnWorkspace() {
             <CardDescription>
               {previewUrl
                 ? "ブロックを埋めるとここに反映されます。"
-                : "②でプレビューを起動すると表示されます。"}
+                : "このバージョンではプレビューは無効です。"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -389,9 +442,9 @@ export function LearnWorkspace() {
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
               />
             ) : (
-              <Button nativeButton={false} render={<Link href="/build" />} variant="secondary">
-                コード生成画面でプレビューを起動する
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                コードを読み解いてブロックを埋めることに集中できます。
+              </p>
             )}
           </CardContent>
         </Card>

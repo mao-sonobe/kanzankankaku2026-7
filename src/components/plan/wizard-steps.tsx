@@ -1,11 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Ear, FileCode2, Lightbulb, Waypoints } from "lucide-react";
+import { BookOpen, Ear, Lightbulb, Waypoints } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
 
-// ①企画チャット ②カードクイズ ③配線パズル ④コード生成(/build) ⑤コード理解(/learn)
+// ①企画チャット ②カードクイズ ③配線パズル ④コード理解(/learn)
 const STEPS: {
   icon: typeof BookOpen;
   label: string;
@@ -15,7 +15,6 @@ const STEPS: {
   { icon: Ear, label: "企画チャット", planStep: 1 },
   { icon: BookOpen, label: "技術クイズ", planStep: 2 },
   { icon: Waypoints, label: "配線パズル", planStep: 3 },
-  { icon: FileCode2, label: "コード生成", href: "/build" },
   { icon: Lightbulb, label: "コード理解", href: "/learn" },
 ];
 
@@ -42,8 +41,9 @@ export function WizardSteps() {
 
   function isReachable(planStepOf?: PlanStep, href?: string): boolean {
     if (planStepOf !== undefined) return planStepOf <= maxPlanReached;
-    if (href === "/build") return !!stackProposal;
-    if (href === "/learn") return hasCode;
+    // コード生成(/build)は廃止。コード理解(/learn)は技術スタック確定後に到達可能
+    // (生成コードが未用意ならlearn側でオンデマンド生成する)。
+    if (href === "/learn") return hasCode || !!stackProposal;
     return false;
   }
 

@@ -104,8 +104,8 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
           <Button variant="outline" onClick={onBack}>
             ←クイズに戻る
           </Button>
-          <Button size="lg" nativeButton={false} render={<Link href="/build" />}>
-            次へ: コードを生成する→
+          <Button size="lg" nativeButton={false} render={<Link href="/learn" />}>
+            次へ: コードを理解する→
           </Button>
         </div>
       </div>
@@ -231,11 +231,11 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
         <Button
           size="lg"
           nativeButton={false}
-          render={<Link href="/build" />}
+          render={<Link href="/learn" />}
           className={cn("rounded-full", allDone && "text-white")}
           style={allDone ? { background: "linear-gradient(90deg, var(--brand-blue), var(--brand-pink))" } : undefined}
         >
-          次へ: コードを生成する→
+          次へ: コードを理解する→
         </Button>
       </div>
     </div>

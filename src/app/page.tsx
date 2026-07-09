@@ -16,17 +16,9 @@ const STEPS = [
   },
   {
     number: "02",
-    title: "コード生成 × ライブプレビュー",
-    description:
-      "確定した技術スタックをもとに、AIが実際に動くNext.jsプロジェクト一式を生成。ブラウザ内(WebContainers)で即座に起動し、その場でプレビューできます。",
-    href: "/build",
-    accent: "var(--brand-blue)",
-  },
-  {
-    number: "03",
     title: "ブロック穴埋めで理解する",
     description:
-      "生成されたコードは意味のある単位の「ブロック」に分解されます。正しいブロックを選んで空欄を埋めるたびに、プレビューがその場で変化。手を動かしながらコードを理解できます。",
+      "確定した技術スタックからAIが実際に動くコードを生成し、意味のある単位の「ブロック」に分解します。正しいブロックを選んで空欄を埋めながら、手を動かしてコードを理解できます。",
     href: "/learn",
     accent: "var(--brand-pink)",
   },
@@ -64,7 +56,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-4 px-6 pb-24 sm:grid-cols-3">
+      <section className="mx-auto grid w-full max-w-3xl grid-cols-1 gap-4 px-6 pb-24 sm:grid-cols-2">
         {STEPS.map((step) => (
           <Link key={step.href} href={step.href} className="group">
             <Card
