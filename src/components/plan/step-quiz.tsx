@@ -112,9 +112,9 @@ export function StepQuiz({
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(130px,180px)_1fr_minmax(320px,420px)]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(130px,180px)_1fr]">
         {/* 左: 回答履歴 */}
-        <div className="order-3 lg:order-1">
+        <div className="order-2 lg:order-1">
           <QuizHistory
             items={answeredItems}
             hoveredNodeId={hoveredNodeId}
@@ -122,13 +122,10 @@ export function StepQuiz({
           />
         </div>
 
-        {/* 中央: 縦チェーン構成図(枠なし) */}
-        <div className="order-2">
+        {/* 主エリア: 上=構成図 / 下=カードデッキ */}
+        <div className="order-1 flex flex-col gap-6 lg:order-2">
           <QuizPipeline nodes={revealedNodes} highlightNodeId={hoveredNodeId} />
-        </div>
 
-        {/* 右: カードデッキ */}
-        <div className="order-1 lg:order-3">
           {!complete && currentNode ? (
             <QuizDeck
               node={currentNode}
@@ -137,7 +134,7 @@ export function StepQuiz({
               onAnswer={handleAnswer}
             />
           ) : (
-            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
+            <div className="mx-auto flex min-h-[200px] w-full max-w-md flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
               <p className="text-sm font-medium">全カード回答済み!</p>
               <p className="text-xs text-muted-foreground">
                 次は、この技術たちの間をデータがどう流れるかを学びましょう。
@@ -148,7 +145,7 @@ export function StepQuiz({
                 className="rounded-full text-white"
                 style={{ background: "var(--brand-pink)" }}
               >
-                パイプライン学習へ→
+                配線パズルへ→
               </Button>
             </div>
           )}

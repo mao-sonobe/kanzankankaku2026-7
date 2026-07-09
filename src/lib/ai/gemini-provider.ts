@@ -1,6 +1,7 @@
 import type {
   AIProvider,
   AnalyzeDataFlowOptions,
+  AnalyzeFeatureFlowsOptions,
   ChatOptions,
   ChunkCodeOptions,
   ChunkCodeResult,
@@ -10,6 +11,7 @@ import type {
 } from "./types";
 import type { TechStackProposal } from "@/lib/domain/stack";
 import type { DataFlowResult } from "@/lib/domain/data-flow";
+import type { FeatureFlowResult } from "@/lib/domain/feature-flow";
 import type { AIProviderSettings } from "./types";
 
 /**
@@ -121,6 +123,24 @@ export class GeminiAIProvider implements AIProvider {
       throw new Error(data.error ?? "データフローの解析に失敗しました");
     }
     return data.result as DataFlowResult;
+  }
+
+  async analyzeFeatureFlows(options: AnalyzeFeatureFlowsOptions): Promise<FeatureFlowResult> {
+    const res = await fetch("/api/gemini/feature-flows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: this.settings.model,
+        files: options.files,
+        planText: options.planText,
+      }),
+      signal: options.signal,
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      throw new Error(data.error ?? "機能フローの解析に失敗しました");
+    }
+    return data.result as FeatureFlowResult;
   }
 
   async checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }> {

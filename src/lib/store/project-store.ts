@@ -4,6 +4,7 @@ import type { ChatMessage, ChunkedFile, GeneratedFile } from "@/lib/ai/types";
 import type { TechStackProposal } from "@/lib/domain/stack";
 import { reconcileQuizState, type StackQuizEntry, type StackQuizState } from "@/lib/domain/stack-quiz";
 import type { DataFlowResult } from "@/lib/domain/data-flow";
+import type { FeatureFlowResult } from "@/lib/domain/feature-flow";
 import { idbStorage } from "./idb-storage";
 
 export interface Highlight {
@@ -38,6 +39,8 @@ interface ProjectState {
   slotAnswers: Record<string, Record<string, string>>;
   /** データフロー解説の解析結果(生成コードに紐づく) */
   dataFlow: DataFlowResult | null;
+  /** 配線パズル(機能ごとのデータフロー)の解析結果(生成コードに紐づく) */
+  featureFlows: FeatureFlowResult | null;
   hasHydrated: boolean;
 
   setPlanStep: (step: PlanStep) => void;
@@ -53,6 +56,7 @@ interface ProjectState {
   answerQuizNode: (nodeId: string, entry: StackQuizEntry) => void;
   skipQuiz: () => void;
   setDataFlow: (result: DataFlowResult | null) => void;
+  setFeatureFlows: (result: FeatureFlowResult | null) => void;
   hoverHighlight: (highlight: Highlight) => void;
   clearHoverHighlight: (highlight: Highlight) => void;
   toggleClickHighlight: (highlight: Highlight) => void;
@@ -88,6 +92,7 @@ const INITIAL_STATE = {
   chunkedFiles: {},
   slotAnswers: {},
   dataFlow: null,
+  featureFlows: null,
 };
 
 export const useProjectStore = create<ProjectState>()(
@@ -141,6 +146,8 @@ export const useProjectStore = create<ProjectState>()(
 
       setDataFlow: (result) => set({ dataFlow: result }),
 
+      setFeatureFlows: (result) => set({ featureFlows: result }),
+
       hoverHighlight: (highlight) => {
         if (!get().pinned) set({ highlighted: highlight });
       },
@@ -176,6 +183,7 @@ export const useProjectStore = create<ProjectState>()(
           slotAnswers: {},
           previewUrl: null,
           dataFlow: null,
+          featureFlows: null,
         }),
 
       setIsPregenerating: (value) => set({ isPregenerating: value }),
@@ -229,6 +237,7 @@ export const useProjectStore = create<ProjectState>()(
         chunkedFiles: state.chunkedFiles,
         slotAnswers: state.slotAnswers,
         dataFlow: state.dataFlow,
+        featureFlows: state.featureFlows,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

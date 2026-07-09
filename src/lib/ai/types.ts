@@ -3,6 +3,7 @@
 
 import type { TechStackProposal } from "@/lib/domain/stack";
 import type { DataFlowResult } from "@/lib/domain/data-flow";
+import type { FeatureFlowResult } from "@/lib/domain/feature-flow";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -98,6 +99,12 @@ export interface AnalyzeDataFlowOptions {
   signal?: AbortSignal;
 }
 
+export interface AnalyzeFeatureFlowsOptions {
+  files: GeneratedFile[];
+  planText: string;
+  signal?: AbortSignal;
+}
+
 /**
  * AI呼び出しの抽象インターフェース。
  * v1実装は OllamaAIProvider のみ。将来 GeminiAIProvider に差し替える計画があるため
@@ -115,6 +122,11 @@ export interface AIProvider {
    * 未対応のプロバイダー(Ollama)は実装しなくてよく、UI側はその場合機能を隠す。
    */
   analyzeDataFlow?(options: AnalyzeDataFlowOptions): Promise<DataFlowResult>;
+  /**
+   * 生成コードを解析し、機能ごとのデータフロー(配線パズル用)を返す。
+   * 未対応のプロバイダー(Ollama)は実装しなくてよく、UI側は機能を隠す。
+   */
+  analyzeFeatureFlows?(options: AnalyzeFeatureFlowsOptions): Promise<FeatureFlowResult>;
   /** 疎通確認。利用可能なモデル一覧を返す */
   checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }>;
 }
