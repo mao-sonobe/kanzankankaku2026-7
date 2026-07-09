@@ -149,7 +149,7 @@ export function StepQuiz({
               />
             </div>
           ) : (
-            <div className="absolute right-6 top-1/2 z-10 -translate-y-1/2">
+            <div className="absolute bottom-8 left-1/2 z-20 -translate-x-1/2">
               <Button
                 size="lg"
                 onClick={onNext}
