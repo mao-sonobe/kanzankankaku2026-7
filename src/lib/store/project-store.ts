@@ -12,8 +12,8 @@ export interface Highlight {
   id: string;
 }
 
-/** ①企画チャット ②カードクイズ ③全体の技術フロー ④配線パズル */
-export type PlanStep = 1 | 2 | 3 | 4;
+/** ①企画チャット ②カードクイズ ③配線パズル */
+export type PlanStep = 1 | 2 | 3;
 
 interface ProjectState {
   planStep: PlanStep;

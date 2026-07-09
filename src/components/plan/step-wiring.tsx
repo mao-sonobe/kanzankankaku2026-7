@@ -102,7 +102,7 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
         </p>
         <div className="flex justify-between">
           <Button variant="outline" onClick={onBack}>
-            ←技術フローに戻る
+            ←クイズに戻る
           </Button>
           <Button size="lg" nativeButton={false} render={<Link href="/build" />}>
             次へ: コードを生成する→
@@ -139,7 +139,7 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
           </>
         )}
         <Button variant="ghost" size="sm" onClick={onBack}>
-          ←技術フローに戻る
+          ←クイズに戻る
         </Button>
       </div>
     );
@@ -226,7 +226,7 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
 
       <div className="flex justify-between pt-2">
         <Button variant="outline" onClick={onBack}>
-          ←技術フローに戻る
+          ←クイズに戻る
         </Button>
         <Button
           size="lg"

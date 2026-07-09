@@ -115,18 +115,19 @@ export function StepQuiz({
       )}
 
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(96px,140px)_1fr]">
-        {/* 左: 回答履歴(左端から少し見切れる) */}
+        {/* 左: 回答履歴(ゲームカード風・左端から少し見切れる) */}
         <div className="order-2 lg:order-1">
           <QuizHistory
             items={answeredItems}
+            proposal={proposal}
             hoveredNodeId={hoveredNodeId}
             onHoverNode={setHoveredNodeId}
           />
         </div>
 
-        {/* 主エリア: 上=構成図(step3と共有) / 下=カードデッキ */}
+        {/* 主エリア: 上=構成図(枠線なし) / 下=カードデッキ */}
         <div className="order-1 flex flex-col gap-6 lg:order-2">
-          <div className="rounded-2xl border-2 p-4" style={{ borderColor: "var(--brand-pink)" }}>
+          <div className="p-2">
             <TechFlowDiagram
               proposal={proposal}
               isRevealed={isRevealed}
@@ -147,7 +148,7 @@ export function StepQuiz({
             <div className="mx-auto flex min-h-[200px] w-full max-w-md flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
               <p className="text-sm font-medium">全カード回答済み!</p>
               <p className="text-xs text-muted-foreground">
-                次は、選んだ技術たちがどうつながるか全体像を見てみましょう。
+                次は、選んだ技術の間でデータがどう流れるかを配線して学びましょう。
               </p>
               <Button
                 size="lg"
@@ -155,7 +156,7 @@ export function StepQuiz({
                 className="rounded-full text-white"
                 style={{ background: "var(--brand-pink)" }}
               >
-                技術フローへ→
+                配線パズルへ→
               </Button>
             </div>
           )}

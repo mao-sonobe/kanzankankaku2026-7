@@ -5,7 +5,6 @@ import { useProjectStore } from "@/lib/store/project-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
 import { StepChat } from "./step-chat";
 import { StepQuiz } from "./step-quiz";
-import { StepPipeline } from "./step-pipeline";
 import { StepWiring } from "./step-wiring";
 
 const READY_MARKER = "[READY]";
@@ -149,15 +148,7 @@ export function PlanWorkspace() {
         ))}
 
       {planStep === 3 && stackProposal && (
-        <StepPipeline
-          proposal={stackProposal}
-          onBack={() => setPlanStep(2)}
-          onNext={() => setPlanStep(4)}
-        />
-      )}
-
-      {planStep === 4 && stackProposal && (
-        <StepWiring onBack={() => setPlanStep(3)} />
+        <StepWiring onBack={() => setPlanStep(2)} />
       )}
     </div>
   );

@@ -1,11 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Ear, FileCode2, Lightbulb, Network, Waypoints } from "lucide-react";
+import { BookOpen, Ear, FileCode2, Lightbulb, Waypoints } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
 
-// ①企画チャット ②カードクイズ ③全体の技術フロー ④配線パズル ⑤コード生成(/build) ⑥コード理解(/learn)
+// ①企画チャット ②カードクイズ ③配線パズル ④コード生成(/build) ⑤コード理解(/learn)
 const STEPS: {
   icon: typeof BookOpen;
   label: string;
@@ -14,8 +14,7 @@ const STEPS: {
 }[] = [
   { icon: Ear, label: "企画チャット", planStep: 1 },
   { icon: BookOpen, label: "技術クイズ", planStep: 2 },
-  { icon: Network, label: "全体の技術フロー", planStep: 3 },
-  { icon: Waypoints, label: "配線パズル", planStep: 4 },
+  { icon: Waypoints, label: "配線パズル", planStep: 3 },
   { icon: FileCode2, label: "コード生成", href: "/build" },
   { icon: Lightbulb, label: "コード理解", href: "/learn" },
 ];
@@ -32,7 +31,7 @@ export function WizardSteps() {
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
 
   const onPlan = pathname === "/plan";
-  const maxPlanReached: PlanStep = stackProposal ? 4 : 1;
+  const maxPlanReached: PlanStep = stackProposal ? 3 : 1;
   const hasCode = generatedFiles.length > 0;
 
   function isActive(planStepOf?: PlanStep, href?: string): boolean {
