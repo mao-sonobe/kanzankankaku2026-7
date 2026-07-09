@@ -80,6 +80,10 @@ interface RawFeature {
  * - steps: from/toがそのfeatureのnode idに含まれるものだけ残す。
  * - node/stepが2件未満のfeatureは捨てる。
  */
+// 配線パズルとして手で操作できる規模に抑える上限。多すぎると図が重なり操作不能になる。
+const MAX_STEPS_PER_FEATURE = 6;
+const MAX_NODES_PER_FEATURE = 6;
+
 export function validateFeatureFlows(
   files: GeneratedFile[],
   raw: RawFeature[]
@@ -89,7 +93,7 @@ export function validateFeatureFlows(
 
   const features: FeatureFlow[] = [];
   raw.forEach((f, fi) => {
-    const nodes: FlowNode[] = (f.nodes ?? []).map((n, ni) => {
+    const allNodes: FlowNode[] = (f.nodes ?? []).map((n, ni) => {
       let snippet = "";
       if (n.snippet) {
         const content = fileByPath.get(n.file) ?? firstFile;
@@ -105,9 +109,26 @@ export function validateFeatureFlows(
         snippet,
       };
     });
-    const nodeIds = new Set(nodes.map((n) => n.id));
-    const steps: FlowStep[] = (f.steps ?? [])
-      .filter((s) => nodeIds.has(s.fromId) && nodeIds.has(s.toId) && s.fromId !== s.toId)
+    const nodeById = new Map(allNodes.map((n) => [n.id, n]));
+
+    // 有効なステップを実行順で最大数まで採用する。
+    const validSteps = (f.steps ?? []).filter(
+      (s) => nodeById.has(s.fromId) && nodeById.has(s.toId) && s.fromId !== s.toId
+    );
+    const keptRaw = validSteps.slice(0, MAX_STEPS_PER_FEATURE);
+
+    // 採用したステップが参照するノードだけに絞る(図の混雑を防ぐ)。
+    const usedIds = new Set<string>();
+    for (const s of keptRaw) {
+      usedIds.add(s.fromId);
+      usedIds.add(s.toId);
+    }
+    let nodes = allNodes.filter((n) => usedIds.has(n.id));
+    if (nodes.length > MAX_NODES_PER_FEATURE) nodes = nodes.slice(0, MAX_NODES_PER_FEATURE);
+    const keptIds = new Set(nodes.map((n) => n.id));
+
+    const steps: FlowStep[] = keptRaw
+      .filter((s) => keptIds.has(s.fromId) && keptIds.has(s.toId))
       .map((s, si) => ({
         id: `f${fi}-s${si}`,
         fromId: s.fromId,
@@ -117,6 +138,7 @@ export function validateFeatureFlows(
         explanation: s.explanation,
         uiResult: s.uiResult?.trim() || undefined,
       }));
+
     if (nodes.length >= 2 && steps.length >= 1) {
       features.push({ id: `feature-${features.length}`, name: f.name, nodes, steps });
     }
@@ -131,31 +153,43 @@ export interface PositionedFlowNode {
   yPct: number;
 }
 
-const ROLE_COLUMN: Record<FlowRole, number> = {
-  screen: 0,
-  component: 0,
-  hook: 1,
-  state: 1,
-  util: 1,
-  db: 2,
-  api: 2,
-};
-
 /**
- * roleで3列(画面=左 / ロジック=中 / データ=右)に分け、各列内は縦に等間隔配置する
- * 決定的レイアウト。ドラッグ配線のヒットテスト用に割合座標を返す。
+ * ノードをステップの登場順に並べ、最大3列のグリッドに均等配置する決定的レイアウト。
+ * 役割ごとに列を固定すると1列に偏って重なるため、順序ベースのグリッドで散らす。
+ * ドラッグ配線のヒットテスト用に割合座標を返す。
  */
 export function layoutFlowNodes(feature: FeatureFlow): PositionedFlowNode[] {
-  const columns: FlowNode[][] = [[], [], []];
-  for (const n of feature.nodes) columns[ROLE_COLUMN[n.role] ?? 1].push(n);
+  // ステップの出発→到達の順にノードidを並べ、残りを後ろに付ける(データが流れる順)。
+  const order: string[] = [];
+  const seen = new Set<string>();
+  const push = (id: string) => {
+    if (!seen.has(id) && feature.nodes.some((n) => n.id === id)) {
+      seen.add(id);
+      order.push(id);
+    }
+  };
+  for (const s of feature.steps) {
+    push(s.fromId);
+    push(s.toId);
+  }
+  for (const n of feature.nodes) push(n.id);
 
-  const xForCol = [0.16, 0.5, 0.84];
+  const nodeById = new Map(feature.nodes.map((n) => [n.id, n]));
+  const ordered = order.map((id) => nodeById.get(id)!).filter(Boolean);
+
+  const n = ordered.length;
+  const cols = n <= 3 ? n : n <= 4 ? 2 : 3;
+  const rows = Math.ceil(n / cols);
+
   const result: PositionedFlowNode[] = [];
-  columns.forEach((col, ci) => {
-    col.forEach((node, i) => {
-      const yPct = col.length === 1 ? 0.5 : 0.18 + (0.64 * i) / (col.length - 1);
-      result.push({ node, xPct: xForCol[ci], yPct });
-    });
+  ordered.forEach((node, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    // 各行の実際の列数(最終行が欠ける場合は中央寄せ)
+    const colsInRow = row === rows - 1 && n % cols !== 0 ? n % cols : cols;
+    const xPct = colsInRow === 1 ? 0.5 : 0.18 + (0.64 * col) / (colsInRow - 1);
+    const yPct = rows === 1 ? 0.5 : 0.16 + (0.68 * row) / (rows - 1);
+    result.push({ node, xPct, yPct });
   });
   return result;
 }

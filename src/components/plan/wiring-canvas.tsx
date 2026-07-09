@@ -129,7 +129,7 @@ export function WiringCanvas({
   return (
     <div
       ref={containerRef}
-      className="relative h-[420px] w-full touch-none select-none rounded-2xl border-2 bg-pink-50/40"
+      className="relative h-[480px] w-full touch-none select-none rounded-2xl border-2 bg-pink-50/40"
       style={{ borderColor: "var(--brand-pink)" }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
