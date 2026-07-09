@@ -137,7 +137,7 @@ export function StepQuiz({
             <div className="mx-auto flex min-h-[200px] w-full max-w-md flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
               <p className="text-sm font-medium">全カード回答済み!</p>
               <p className="text-xs text-muted-foreground">
-                次は、この技術たちの間をデータがどう流れるかを学びましょう。
+                次は、選んだ技術たちがどうつながるか全体像を見てみましょう。
               </p>
               <Button
                 size="lg"
@@ -145,7 +145,7 @@ export function StepQuiz({
                 className="rounded-full text-white"
                 style={{ background: "var(--brand-pink)" }}
               >
-                配線パズルへ→
+                技術フローへ→
               </Button>
             </div>
           )}
