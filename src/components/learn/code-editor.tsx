@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { EditorView, Decoration, WidgetType, type DecorationSet } from "@codemirror/view";
 import type { BlockRole, ChunkedFile } from "@/lib/ai/types";
 import type { StackCategory, TechStackNode } from "@/lib/domain/stack";
 import { buildFileContentWithRanges, type SlotRange } from "@/lib/domain/chunk-code";
+import type { FeatureRangesInChunked, RenderedFeatureRange } from "@/lib/domain/feature-map";
 import { BLOCK_ROLE_LABEL } from "@/lib/domain/block-colors";
 import { techIconUrl } from "@/lib/domain/tech-icon";
 
@@ -23,7 +24,7 @@ const ROLE_HEX: Record<BlockRole, { bg: string; border: string }> = {
   other: { bg: "#f3f4f6", border: "#9ca3af" },
 };
 
-// stack-colors.tsのTailwindカラー(100/400/900)に対応する実色値。データフロー解説でも使う。
+// stack-colors.tsのTailwindカラー(100/400/900)に対応する実色値。
 export const CATEGORY_HEX: Record<StackCategory, { bg: string; border: string; text: string }> = {
   frontend: { bg: "#dbeafe", border: "#60a5fa", text: "#1e3a8a" },
   backend: { bg: "#d1fae5", border: "#34d399", text: "#064e3b" },
@@ -37,7 +38,8 @@ class SlotWidget extends WidgetType {
     private readonly range: SlotRange,
     private readonly isActive: boolean,
     private readonly onClick: (slotId: string) => void,
-    private readonly relatedNode: TechStackNode | null
+    private readonly relatedNode: TechStackNode | null,
+    private readonly isFeatureActive: boolean
   ) {
     super();
   }
@@ -46,13 +48,17 @@ class SlotWidget extends WidgetType {
     return (
       other.range.slot.id === this.range.slot.id &&
       other.isActive === this.isActive &&
-      other.relatedNode?.id === this.relatedNode?.id
+      other.relatedNode?.id === this.relatedNode?.id &&
+      other.isFeatureActive === this.isFeatureActive
     );
   }
 
   toDOM() {
     const el = document.createElement("span");
-    el.className = `cm-slot-empty cm-role-${this.range.slot.role}${this.isActive ? " cm-slot-active" : ""}`;
+    el.className =
+      `cm-slot-empty cm-role-${this.range.slot.role}` +
+      (this.isActive ? " cm-slot-active" : "") +
+      (this.isFeatureActive ? " cm-feature-active" : "");
     el.dataset.slotId = this.range.slot.id;
 
     const label = document.createElement("span");
@@ -109,22 +115,83 @@ function buildDecorations(
   ranges: SlotRange[],
   activeSlotId: string | null,
   onSlotClick: (slotId: string) => void,
-  nodeById: Map<string, TechStackNode> | undefined
+  nodeById: Map<string, TechStackNode> | undefined,
+  featureRanges: FeatureRangesInChunked | null
 ): DecorationSet {
   const decos = ranges.map((r) => {
+    const isFeatureActive = featureRanges?.slotIds.has(r.slot.id) ?? false;
     if (r.choice) {
       return Decoration.mark({
-        class: `cm-slot-filled cm-role-${r.slot.role}${activeSlotId === r.slot.id ? " cm-slot-active" : ""}`,
+        class:
+          `cm-slot-filled cm-role-${r.slot.role}` +
+          (activeSlotId === r.slot.id ? " cm-slot-active" : "") +
+          (isFeatureActive ? " cm-feature-active" : ""),
         attributes: { "data-slot-id": r.slot.id },
       }).range(r.start, r.end);
     }
     const relatedNode =
       (r.slot.relatedStackNodeId && nodeById?.get(r.slot.relatedStackNodeId)) || null;
     return Decoration.replace({
-      widget: new SlotWidget(r, activeSlotId === r.slot.id, onSlotClick, relatedNode),
+      widget: new SlotWidget(r, activeSlotId === r.slot.id, onSlotClick, relatedNode, isFeatureActive),
     }).range(r.start, r.end);
   });
-  return Decoration.set(decos, true);
+
+  const featureBlockDecos = (featureRanges?.textRanges ?? []).map((r) =>
+    Decoration.mark({ class: "cm-feature-block" }).range(r.start, r.end)
+  );
+
+  return Decoration.set([...decos, ...featureBlockDecos], true);
+}
+
+/** 現在アクティブな機能のコード片(通常コード+空欄)を、エディタ上の座標に変換して結んだ線を描く。 */
+function useFeatureConnectorLines(
+  view: EditorView | null,
+  points: RenderedFeatureRange[],
+  containerRef: React.RefObject<HTMLDivElement | null>
+) {
+  const [segments, setSegments] = useState<{ x1: number; y1: number; x2: number; y2: number }[]>([]);
+
+  useEffect(() => {
+    if (!view || points.length < 2) {
+      setSegments([]);
+      return;
+    }
+    function recompute() {
+      const container = containerRef.current;
+      if (!container || !view) return;
+      const containerRect = container.getBoundingClientRect();
+      const resolved = points
+        .map((p) => {
+          const mid = Math.floor((p.start + p.end) / 2);
+          try {
+            const coords = view.coordsAtPos(mid);
+            if (!coords) return null;
+            return {
+              x: (coords.left + coords.right) / 2 - containerRect.left,
+              y: (coords.top + coords.bottom) / 2 - containerRect.top,
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter((p): p is { x: number; y: number } => p !== null);
+      const segs = [];
+      for (let i = 0; i < resolved.length - 1; i++) {
+        segs.push({ x1: resolved[i].x, y1: resolved[i].y, x2: resolved[i + 1].x, y2: resolved[i + 1].y });
+      }
+      setSegments(segs);
+    }
+    recompute();
+    const scroller = view.scrollDOM;
+    scroller.addEventListener("scroll", recompute);
+    window.addEventListener("resize", recompute);
+    return () => {
+      scroller.removeEventListener("scroll", recompute);
+      window.removeEventListener("resize", recompute);
+    };
+  }, [view, points, containerRef]);
+
+  return segments;
 }
 
 export function CodeEditor({
@@ -133,6 +200,8 @@ export function CodeEditor({
   activeSlotId,
   onSlotClick,
   nodeById,
+  featureRanges,
+  featureColorHex,
 }: {
   chunked: ChunkedFile;
   answers: Record<string, string>;
@@ -140,14 +209,31 @@ export function CodeEditor({
   onSlotClick: (slotId: string) => void;
   /** 技術スタックノードの参照(空欄→技術チップ表示用)。任意 */
   nodeById?: Map<string, TechStackNode>;
-}) {
+  /** 現在アクティブな機能がこのファイル内で占める範囲。任意(機能マップ未選択時はundefined) */
+  featureRanges?: FeatureRangesInChunked | null;
+  /** アクティブな機能の配色(実色値)。featureRangesとセットで指定する */
+  featureColorHex?: { bg: string; border: string };
+  }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [view, setView] = useState<EditorView | null>(null);
+
   const { text, ranges } = useMemo(
     () => buildFileContentWithRanges(chunked, answers),
     [chunked, answers]
   );
 
+  const connectorPoints = useMemo(() => {
+    if (!featureRanges) return [];
+    const slotPoints = ranges
+      .filter((r) => featureRanges.slotIds.has(r.slot.id))
+      .map((r) => ({ start: r.start, end: r.end }));
+    return [...featureRanges.textRanges, ...slotPoints].sort((a, b) => a.start - b.start);
+  }, [featureRanges, ranges]);
+
+  const connectorSegments = useFeatureConnectorLines(view, connectorPoints, containerRef);
+
   const extensions = useMemo(() => {
-    const decorations = buildDecorations(ranges, activeSlotId, onSlotClick, nodeById);
+    const decorations = buildDecorations(ranges, activeSlotId, onSlotClick, nodeById, featureRanges ?? null);
     return [
       javascript({ jsx: true }),
       EditorView.editable.of(false),
@@ -200,6 +286,16 @@ export function CodeEditor({
           padding: "0 2px",
           cursor: "pointer",
         },
+        ".cm-feature-block": {
+          borderRadius: "4px",
+          padding: "0 2px",
+          backgroundColor: featureColorHex?.bg ?? "transparent",
+          boxShadow: featureColorHex ? `inset 0 0 0 1px ${featureColorHex.border}` : "none",
+        },
+        // 機能に関わる空欄は、既存の役割色の背景の上から縁取りだけを重ねる(背景の衝突を避ける)。
+        ".cm-feature-active": {
+          boxShadow: featureColorHex ? `inset 0 0 0 2px ${featureColorHex.border}` : "none",
+        },
         ...Object.fromEntries(
           Object.entries(ROLE_HEX).flatMap(([role, { bg, border }]) => [
             [
@@ -212,14 +308,31 @@ export function CodeEditor({
       }),
     ];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ranges, activeSlotId, nodeById]);
+  }, [ranges, activeSlotId, nodeById, featureRanges, featureColorHex]);
 
   return (
-    <CodeMirror
-      value={text}
-      height="480px"
-      basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: false }}
-      extensions={extensions}
-    />
+    <div ref={containerRef} className="relative">
+      <CodeMirror
+        value={text}
+        height="480px"
+        basicSetup={{ lineNumbers: true, foldGutter: false, highlightActiveLine: false }}
+        extensions={extensions}
+        onCreateEditor={(v) => setView(v)}
+      />
+      {connectorSegments.length > 0 && (
+        <svg className="pointer-events-none absolute inset-0 size-full overflow-hidden">
+          {connectorSegments.map((s, i) => (
+            <path
+              key={i}
+              d={`M ${s.x1} ${s.y1} C ${(s.x1 + s.x2) / 2} ${s.y1}, ${(s.x1 + s.x2) / 2} ${s.y2}, ${s.x2} ${s.y2}`}
+              stroke={featureColorHex?.border ?? "#6366f1"}
+              strokeWidth={2}
+              strokeDasharray="4 3"
+              fill="none"
+            />
+          ))}
+        </svg>
+      )}
+    </div>
   );
 }

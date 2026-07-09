@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Folder, FileCode } from "lucide-react";
+import type { FeatureColor } from "@/lib/domain/feature-colors";
 
 interface TreeNode {
   name: string;
@@ -47,12 +48,14 @@ function TreeRow({
   depth,
   selectedPath,
   learnablePaths,
+  featureColorByPath,
   onSelect,
 }: {
   node: TreeNode;
   depth: number;
   selectedPath: string | null;
   learnablePaths: Set<string>;
+  featureColorByPath?: Map<string, FeatureColor>;
   onSelect: (path: string) => void;
 }) {
   if (!node.isFile) {
@@ -72,6 +75,7 @@ function TreeRow({
             depth={depth + 1}
             selectedPath={selectedPath}
             learnablePaths={learnablePaths}
+            featureColorByPath={featureColorByPath}
             onSelect={onSelect}
           />
         ))}
@@ -81,19 +85,27 @@ function TreeRow({
 
   const isSelected = node.path === selectedPath;
   const isLearnable = learnablePaths.has(node.path);
+  const featureColor = featureColorByPath?.get(node.path);
 
   return (
     <button
       onClick={() => onSelect(node.path)}
       className={cn(
         "flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-sm transition-colors",
-        isSelected ? "bg-primary/10 font-medium text-foreground" : "text-muted-foreground hover:bg-muted"
+        featureColor
+          ? cn(featureColor.bg, featureColor.text, "font-medium")
+          : isSelected
+            ? "bg-primary/10 font-medium text-foreground"
+            : "text-muted-foreground hover:bg-muted",
+        isSelected && !featureColor && "bg-primary/10"
       )}
       style={{ paddingLeft: `${8 + depth * 14}px` }}
     >
       <FileCode className="size-3.5 shrink-0" />
       <span className="truncate">{node.name}</span>
-      {isLearnable && <span className="ml-auto size-1.5 shrink-0 rounded-full bg-emerald-500" title="穴埋め学習対象" />}
+      {isLearnable && !featureColor && (
+        <span className="ml-auto size-1.5 shrink-0 rounded-full bg-emerald-500" title="穴埋め学習対象" />
+      )}
     </button>
   );
 }
@@ -102,11 +114,14 @@ export function FileTree({
   paths,
   selectedPath,
   learnablePaths,
+  featureColorByPath,
   onSelect,
 }: {
   paths: string[];
   selectedPath: string | null;
   learnablePaths: Set<string>;
+  /** 指定時、アクティブな機能に関わるファイルをそのfeatureColorで塗る */
+  featureColorByPath?: Map<string, FeatureColor>;
   onSelect: (path: string) => void;
 }) {
   const tree = buildTree(paths);
@@ -120,6 +135,7 @@ export function FileTree({
           depth={0}
           selectedPath={selectedPath}
           learnablePaths={learnablePaths}
+          featureColorByPath={featureColorByPath}
           onSelect={onSelect}
         />
       ))}
