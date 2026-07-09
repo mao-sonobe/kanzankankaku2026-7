@@ -13,7 +13,7 @@ import type { TechStackProposal } from "@/lib/domain/stack";
 import { getAIProvider } from "@/lib/ai/get-provider";
 import { getScaffoldFiles } from "@/lib/generated-app/scaffold";
 import { useProjectStore } from "@/lib/store/project-store";
-import { QuizPipeline } from "./quiz-pipeline";
+import { TechFlowDiagram } from "./tech-flow-diagram";
 import { QuizDeck } from "./quiz-deck";
 import { QuizHistory, type QuizHistoryItem } from "./quiz-history";
 
@@ -42,10 +42,12 @@ export function StepQuiz({
     [ordered]
   );
 
-  // 回答済みノードをパイプライン順で(中央の縦チェーンに使う)
-  const revealedNodes = ordered.filter(
-    (n) => stackQuizSkipped || getQuizEntry(stackQuiz, n.id) || buildQuizChoices(n) === null
-  );
+  // 回答済み(または誤答を作れずクイズ対象外)のノードだけ構成図に出す。
+  function isRevealed(nodeId: string) {
+    if (stackQuizSkipped) return true;
+    const node = proposal.nodes.find((n) => n.id === nodeId);
+    return !!getQuizEntry(stackQuiz, nodeId) || (node ? buildQuizChoices(node) === null : false);
+  }
 
   // 履歴カードは新しい順
   const answeredItems: QuizHistoryItem[] = quizNodes
@@ -112,8 +114,8 @@ export function StepQuiz({
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(130px,180px)_1fr]">
-        {/* 左: 回答履歴 */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(96px,140px)_1fr]">
+        {/* 左: 回答履歴(左端から少し見切れる) */}
         <div className="order-2 lg:order-1">
           <QuizHistory
             items={answeredItems}
@@ -122,9 +124,17 @@ export function StepQuiz({
           />
         </div>
 
-        {/* 主エリア: 上=構成図 / 下=カードデッキ */}
+        {/* 主エリア: 上=構成図(step3と共有) / 下=カードデッキ */}
         <div className="order-1 flex flex-col gap-6 lg:order-2">
-          <QuizPipeline nodes={revealedNodes} highlightNodeId={hoveredNodeId} />
+          <div className="rounded-2xl border-2 p-4" style={{ borderColor: "var(--brand-pink)" }}>
+            <TechFlowDiagram
+              proposal={proposal}
+              isRevealed={isRevealed}
+              hideUnrevealed
+              highlightNodeId={hoveredNodeId}
+              onHoverNode={setHoveredNodeId}
+            />
+          </div>
 
           {!complete && currentNode ? (
             <QuizDeck

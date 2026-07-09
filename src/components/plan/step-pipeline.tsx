@@ -3,12 +3,6 @@
 import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DIAGRAM_NODE_H,
-  DIAGRAM_NODE_W,
-  layoutStackDiagram,
-  type LaidOutEdge,
-} from "@/lib/domain/stack-layout";
 import { CATEGORY_COLORS } from "@/lib/domain/stack-colors";
 import {
   STACK_CATEGORY_LABEL,
@@ -18,19 +12,15 @@ import {
 } from "@/lib/domain/stack";
 import { buildStackSummaryPng } from "@/lib/domain/stack-image";
 import { TechIcon } from "@/components/ui/tech-icon";
+import { TechFlowDiagram } from "./tech-flow-diagram";
 import { cn } from "@/lib/utils";
 
 const CATEGORY_ORDER: StackCategory[] = ["frontend", "backend", "data", "infra", "other"];
 
-function edgePath(e: LaidOutEdge): string {
-  return e.path ?? `M ${e.x1} ${e.y1} L ${e.x2} ${e.y2}`;
-}
-
 /**
- * ③パイプライン学習。エッジにホバーすると「何のデータが渡るか」の吹き出しが出て、
- * エネルギーフロー図のようにデータの粒がエッジ上を流れる。ノードにホバーすると
- * 強調表示され、右パネルにそのノードが関わる全フローが表示される。
- * 下部にカテゴリ別解説とまとめ画像保存(旧STEP4を統合)。
+ * ③全体の技術フロー。技術スタック全体の構成図(step2と共有のTechFlowDiagram)を表示し、
+ * ノードにホバーすると右パネルにそのノードが関わる全フローが出る。
+ * 下部にカテゴリ別解説とまとめ画像保存。
  */
 export function StepPipeline({
   proposal,
@@ -42,11 +32,9 @@ export function StepPipeline({
   onNext: () => void;
 }) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
 
-  const layout = useMemo(() => layoutStackDiagram(proposal), [proposal]);
   const nodeById = useMemo(
     () => new Map(proposal.nodes.map((n) => [n.id, n])),
     [proposal]
@@ -86,12 +74,6 @@ export function StepPipeline({
     }
   }
 
-  function edgeEmphasized(e: LaidOutEdge) {
-    if (hoveredEdgeId === e.edge.id) return true;
-    if (hoveredNodeId) return e.edge.source === hoveredNodeId || e.edge.target === hoveredNodeId;
-    return false;
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -110,123 +92,13 @@ export function StepPipeline({
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        {/* フロー図 */}
-        <div
-          className="overflow-x-auto rounded-2xl border-2 p-4"
-          style={{ borderColor: "var(--brand-pink)" }}
-        >
-          <div className="relative" style={{ width: layout.width, height: layout.height }}>
-            <svg
-              viewBox={`0 0 ${layout.width} ${layout.height}`}
-              width={layout.width}
-              height={layout.height}
-              className="absolute inset-0"
-              style={{ pointerEvents: "none" }}
-            >
-              <defs>
-                <marker
-                  id="flow-arrow"
-                  viewBox="0 0 10 10"
-                  refX="8"
-                  refY="5"
-                  markerWidth="7"
-                  markerHeight="7"
-                  orient="auto-start-reverse"
-                >
-                  <path
-                    d="M2 1L8 5L2 9"
-                    fill="none"
-                    stroke="#94a3b8"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </marker>
-              </defs>
-              {layout.edges.map((e) => {
-                const emphasized = edgeEmphasized(e);
-                return (
-                  <g key={e.edge.id}>
-                    <path
-                      d={edgePath(e)}
-                      fill="none"
-                      stroke={emphasized ? "var(--brand-pink)" : "#94a3b8"}
-                      strokeWidth={emphasized ? 2.5 : 1.5}
-                      markerEnd="url(#flow-arrow)"
-                    />
-                    {/* データの粒が流れるアニメーション */}
-                    <circle r={emphasized ? 4.5 : 3} fill="var(--brand-pink)" opacity={emphasized ? 0.9 : 0.5}>
-                      <animateMotion dur="2.4s" repeatCount="indefinite" path={edgePath(e)} />
-                    </circle>
-                    {/* ホバー判定用の太い透明ストローク */}
-                    <path
-                      d={edgePath(e)}
-                      fill="none"
-                      stroke="transparent"
-                      strokeWidth="18"
-                      style={{ pointerEvents: "stroke", cursor: "pointer" }}
-                      onMouseEnter={() => setHoveredEdgeId(e.edge.id)}
-                      onMouseLeave={() => setHoveredEdgeId(null)}
-                    />
-                  </g>
-                );
-              })}
-            </svg>
-
-            {/* ノード */}
-            {layout.nodes.map(({ node, x, y }) => {
-              const colors = CATEGORY_COLORS[node.category];
-              const highlighted =
-                hoveredNodeId === node.id ||
-                (hoveredEdgeId !== null &&
-                  layout.edges.some(
-                    (e) =>
-                      e.edge.id === hoveredEdgeId &&
-                      (e.edge.source === node.id || e.edge.target === node.id)
-                  ));
-              return (
-                <div
-                  key={node.id}
-                  onMouseEnter={() => setHoveredNodeId(node.id)}
-                  onMouseLeave={() => setHoveredNodeId(null)}
-                  className={cn(
-                    "absolute flex cursor-pointer items-center gap-2 rounded-xl border px-3 transition-transform",
-                    colors.bg,
-                    colors.border,
-                    highlighted && "z-10 scale-110 shadow-lg ring-2"
-                  )}
-                  style={{
-                    left: x,
-                    top: y,
-                    width: DIAGRAM_NODE_W,
-                    height: DIAGRAM_NODE_H,
-                    ...(highlighted ? { ["--tw-ring-color" as string]: "var(--brand-pink)" } : {}),
-                  }}
-                >
-                  <TechIcon name={node.label} size={24} />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{node.label}</p>
-                    <p className={cn("text-[10px]", colors.text)}>
-                      {STACK_CATEGORY_LABEL[node.category]}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-
-            {/* エッジホバー時の吹き出し */}
-            {layout.edges.map((e) =>
-              hoveredEdgeId === e.edge.id && e.edge.label ? (
-                <div
-                  key={`bubble-${e.edge.id}`}
-                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-full border border-pink-300 bg-white px-3 py-1 text-xs font-semibold shadow-md"
-                  style={{ left: e.labelX, top: e.labelY }}
-                >
-                  {e.edge.label}
-                </div>
-              ) : null
-            )}
-          </div>
+        {/* フロー図(step2と共有) */}
+        <div className="rounded-2xl border-2 p-4" style={{ borderColor: "var(--brand-pink)" }}>
+          <TechFlowDiagram
+            proposal={proposal}
+            highlightNodeId={hoveredNodeId}
+            onHoverNode={setHoveredNodeId}
+          />
         </div>
 
         {/* ホバー詳細パネル */}

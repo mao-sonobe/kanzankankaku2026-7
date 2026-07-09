@@ -82,24 +82,26 @@ export function QuizHistory({
             onMouseEnter={() => onHoverNode(node.id)}
             onMouseLeave={() => onHoverNode(null)}
           >
-            {/* 通常時の小カード */}
-            <div
-              className={cn(
-                "rounded-lg border border-pink-200 bg-pink-100 p-2 shadow-sm transition-opacity",
-                hovered && "opacity-0"
-              )}
-            >
-              <p className="flex items-center gap-1 text-xs font-bold">
-                <TechIcon name={displayTech} size={12} />
-                <span className="truncate">{displayTech}</span>
-                <ResultMark correct={!isWrong} />
-              </p>
-              <p className="mt-1 line-clamp-3 text-[10px] leading-snug text-slate-600">
-                {displayText}
-              </p>
+            {/* 通常時の小カード。左端が少し見切れるようにクリップ(内容は右側で読める)。 */}
+            <div className="overflow-hidden">
+              <div
+                className={cn(
+                  "-ml-4 w-[calc(100%+1rem)] rounded-lg border border-pink-200 bg-pink-100 p-2 pl-5 shadow-sm transition-opacity",
+                  hovered && "opacity-0"
+                )}
+              >
+                <p className="flex items-center gap-1 text-xs font-bold">
+                  <TechIcon name={displayTech} size={12} />
+                  <span className="truncate">{displayTech}</span>
+                  <ResultMark correct={!isWrong} />
+                </p>
+                <p className="mt-1 line-clamp-3 text-[10px] leading-snug text-slate-600">
+                  {displayText}
+                </p>
+              </div>
             </div>
 
-            {/* ホバー時の拡大表示(右方向へ展開) */}
+            {/* ホバー時の拡大表示(右方向へ展開、クリップ外なので全文見える) */}
             {hovered && (
               <div
                 className={cn(
