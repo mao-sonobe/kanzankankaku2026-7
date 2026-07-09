@@ -105,18 +105,20 @@ export function StepQuiz({
   }, [planText, proposal]);
 
   return (
-    <div className="relative">
+    // 画面いっぱいに広げ(フルブリード)、ヘッダー分を除いた高さに収めてスクロールを無くす。
+    // planページのpy-10を-my-10で打ち消してビューポート高にぴったり合わせる。
+    <div className="relative left-1/2 -my-10 h-[calc(100vh-4rem-1px)] w-screen -translate-x-1/2 overflow-hidden">
       {!complete && (
-        <div className="absolute right-0 top-0 z-20">
+        <div className="absolute right-4 top-2 z-30">
           <Button variant="ghost" size="sm" onClick={skipQuiz}>
             全部見る
           </Button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(96px,140px)_1fr]">
-        {/* 左: 回答履歴(ゲームカード風・左端から少し見切れる) */}
-        <div className="order-2 lg:order-1">
+      <div className="flex h-full">
+        {/* 左: 回答履歴(画面左端に密着・ゲームカード風) */}
+        <div className="w-[120px] flex-none pt-4">
           <QuizHistory
             items={answeredItems}
             proposal={proposal}
@@ -125,9 +127,9 @@ export function StepQuiz({
           />
         </div>
 
-        {/* 主エリア: 上=構成図(枠線なし) / 下=カードデッキ */}
-        <div className="order-1 flex flex-col gap-6 lg:order-2">
-          <div className="p-2">
+        {/* 主エリア: 構成図を下地に、カードデッキを重ねて配置(一画面に収める) */}
+        <div className="relative flex-1 overflow-hidden">
+          <div className="absolute inset-0 flex items-center p-4">
             <TechFlowDiagram
               proposal={proposal}
               isRevealed={isRevealed}
@@ -138,23 +140,21 @@ export function StepQuiz({
           </div>
 
           {!complete && currentNode ? (
-            <QuizDeck
-              node={currentNode}
-              choices={currentChoices}
-              remaining={quizNodes.length - answeredCount}
-              onAnswer={handleAnswer}
-            />
+            <div className="absolute right-6 top-1/2 z-10 w-[380px] max-w-[42vw] -translate-y-1/2">
+              <QuizDeck
+                node={currentNode}
+                choices={currentChoices}
+                remaining={quizNodes.length - answeredCount}
+                onAnswer={handleAnswer}
+              />
+            </div>
           ) : (
-            <div className="mx-auto flex min-h-[200px] w-full max-w-md flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
-              <p className="text-sm font-medium">全カード回答済み!</p>
-              <p className="text-xs text-muted-foreground">
-                次は、選んだ技術の間でデータがどう流れるかを配線して学びましょう。
-              </p>
+            <div className="absolute right-6 top-1/2 z-10 -translate-y-1/2">
               <Button
                 size="lg"
                 onClick={onNext}
-                className="rounded-full text-white"
-                style={{ background: "var(--brand-pink)" }}
+                className="rounded-full text-white shadow-lg"
+                style={{ background: "linear-gradient(90deg, var(--brand-blue), var(--brand-pink))" }}
               >
                 配線パズルへ→
               </Button>

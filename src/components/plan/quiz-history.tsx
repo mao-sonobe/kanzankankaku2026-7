@@ -138,7 +138,7 @@ export function QuizHistory({
             {hovered && (
               <div
                 className={cn(
-                  "absolute left-0 top-0 z-30 flex gap-2",
+                  "absolute left-0 top-0 z-40 flex gap-2",
                   isWrong ? "w-[440px]" : "w-[240px]"
                 )}
               >
