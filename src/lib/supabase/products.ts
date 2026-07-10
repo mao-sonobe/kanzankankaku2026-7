@@ -24,6 +24,8 @@ export interface ProductRow {
   slot_answers: Record<string, Record<string, string>>;
   feature_map: FeatureMapResult | null;
   feature_flows: FeatureFlowResult | null;
+  /** trueの間は自動保存がtitleを上書きしない(ユーザーが手動でリネームした)。 */
+  title_is_custom: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -58,7 +60,7 @@ export function deriveTitle(projectTitle: string | null, planText: string): stri
 }
 
 export interface ProductUpsertPayload {
-  title: string;
+  title?: string;
   plan_step: PlanStep;
   plan_text: string;
   project_title: string | null;
@@ -90,9 +92,25 @@ export async function createProduct(
 
 export async function updateProduct(
   id: string,
-  payload: ProductUpsertPayload
+  payload: Partial<ProductUpsertPayload>
 ): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.from("products").update(payload).eq("id", id);
+  if (error) throw error;
+}
+
+/** サイドバーの「名前を変更」から呼ばれる。以後、自動保存はtitleを上書きしなくなる。 */
+export async function renameProduct(id: string, title: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("products")
+    .update({ title, title_is_custom: true })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteProduct(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("products").delete().eq("id", id);
   if (error) throw error;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DEFAULT_AI_SETTINGS, OPENAI_DEFAULT_MODEL, loadAISettings, saveAISettings } from "@/lib/ai/settings";
 import type { AIProviderKind } from "@/lib/ai/types";
-import { useProjectStore } from "@/lib/store/project-store";
+import { useAuth } from "@/lib/supabase/use-auth";
+import { createClient } from "@/lib/supabase/client";
 
 type ConnectionState =
   | { status: "idle" }
@@ -19,14 +21,31 @@ type ConnectionState =
   | { status: "error"; message: string };
 
 export default function SettingsPage() {
+  const router = useRouter();
+  const { user } = useAuth();
   const [provider, setProvider] = useState<AIProviderKind>(DEFAULT_AI_SETTINGS.provider);
   const [endpoint, setEndpoint] = useState(DEFAULT_AI_SETTINGS.endpoint);
   const [model, setModel] = useState(DEFAULT_AI_SETTINGS.model);
   const [conn, setConn] = useState<ConnectionState>({ status: "idle" });
   const [saved, setSaved] = useState(false);
-  const [resetConfirm, setResetConfirm] = useState(false);
-  const resetProject = useProjectStore((s) => s.resetProject);
-  const planText = useProjectStore((s) => s.planText);
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteAccount() {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error ?? "アカウントの削除に失敗しました");
+      await createClient().auth.signOut();
+      router.push("/login");
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "アカウントの削除に失敗しました");
+      setIsDeleting(false);
+    }
+  }
 
   useEffect(() => {
     const settings = loadAISettings();
@@ -173,41 +192,41 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>プロジェクトのリセット</CardTitle>
-          <CardDescription>
-            企画書・技術スタック・生成コード・学習の進捗をすべて削除し、新しいプロジェクトを始めます。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {!resetConfirm ? (
-            <Button
-              variant="destructive"
-              disabled={!planText}
-              onClick={() => setResetConfirm(true)}
-            >
-              プロジェクトをリセットする
-            </Button>
-          ) : (
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-destructive">本当に削除しますか?元に戻せません。</span>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  resetProject();
-                  setResetConfirm(false);
-                }}
-              >
-                削除する
+      {user && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>アカウント消去</CardTitle>
+            <CardDescription>
+              アカウント({user.is_anonymous ? "ゲスト" : user.email})と、保存されているすべてのプロダクト履歴を完全に削除します。この操作は元に戻せません。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!deleteConfirm ? (
+              <Button variant="destructive" onClick={() => setDeleteConfirm(true)}>
+                アカウントを削除する
               </Button>
-              <Button variant="ghost" onClick={() => setResetConfirm(false)}>
-                キャンセル
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-destructive">
+                  本当に削除しますか?すべてのプロダクト履歴も失われ、元に戻せません。
+                </span>
+                <Button variant="destructive" onClick={handleDeleteAccount} disabled={isDeleting}>
+                  {isDeleting ? "削除中…" : "完全に削除する"}
+                </Button>
+                <Button variant="ghost" onClick={() => setDeleteConfirm(false)} disabled={isDeleting}>
+                  キャンセル
+                </Button>
+              </div>
+            )}
+            {deleteError && (
+              <Alert variant="destructive">
+                <AlertTitle>削除に失敗しました</AlertTitle>
+                <AlertDescription>{deleteError}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

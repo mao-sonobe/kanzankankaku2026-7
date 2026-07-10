@@ -43,6 +43,8 @@ interface ProjectState {
   featureFlows: FeatureFlowResult | null;
   /** Supabase products テーブルの行id。未保存(ゲスト新規チャットの初回操作前など)はnull */
   currentProductId: string | null;
+  /** trueの間は自動保存がtitleを上書きしない(サイドバーで手動リネームした) */
+  titleIsCustom: boolean;
   hasHydrated: boolean;
 
   setPlanStep: (step: PlanStep) => void;
@@ -69,8 +71,8 @@ interface ProjectState {
   setPreviewUrl: (url: string | null) => void;
   setChunkedFile: (path: string, chunked: ChunkedFile) => void;
   setSlotAnswer: (path: string, slotId: string, choiceId: string) => void;
-  resetProject: () => void;
   setCurrentProductId: (id: string | null) => void;
+  setTitleIsCustom: (value: boolean) => void;
   /** 新規チャットを開始する(状態を初期化しつつ、Supabaseの行idも切り離す)。 */
   startNewProduct: () => void;
   /** Supabaseから読み込んだプロダクトの内容をストアに反映する。 */
@@ -89,6 +91,7 @@ interface ProjectState {
     slotAnswers: Record<string, Record<string, string>>;
     featureMap: FeatureMapResult | null;
     featureFlows: FeatureFlowResult | null;
+    titleIsCustom: boolean;
   }) => void;
   setHasHydrated: (value: boolean) => void;
 }
@@ -116,6 +119,7 @@ const INITIAL_STATE = {
   featureMap: null,
   featureFlows: null,
   currentProductId: null as string | null,
+  titleIsCustom: false,
 };
 
 export const useProjectStore = create<ProjectState>()(
@@ -229,15 +233,16 @@ export const useProjectStore = create<ProjectState>()(
           },
         })),
 
-      resetProject: () => set({ ...INITIAL_STATE }),
-
       setCurrentProductId: (id) => set({ currentProductId: id }),
+
+      setTitleIsCustom: (value) => set({ titleIsCustom: value }),
 
       startNewProduct: () => set({ ...INITIAL_STATE }),
 
       loadProduct: (product) =>
         set({
           currentProductId: product.id,
+          titleIsCustom: product.titleIsCustom,
           planStep: product.planStep,
           planText: product.planText,
           projectTitle: product.projectTitle,
@@ -293,6 +298,7 @@ export const useProjectStore = create<ProjectState>()(
         featureMap: state.featureMap,
         featureFlows: state.featureFlows,
         currentProductId: state.currentProductId,
+        titleIsCustom: state.titleIsCustom,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

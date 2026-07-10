@@ -30,7 +30,6 @@ export function useProductSync() {
       savingRef.current = true;
       try {
         const payload: ProductUpsertPayload = {
-          title: deriveTitle(state.projectTitle, state.planText),
           plan_step: state.planStep,
           plan_text: state.planText,
           project_title: state.projectTitle,
@@ -47,9 +46,16 @@ export function useProductSync() {
         };
 
         if (state.currentProductId) {
-          await updateProduct(state.currentProductId, payload);
+          // 手動リネーム済みのプロダクトはtitleを自動上書きしない。
+          const updatePayload = state.titleIsCustom
+            ? payload
+            : { ...payload, title: deriveTitle(state.projectTitle, state.planText) };
+          await updateProduct(state.currentProductId, updatePayload);
         } else {
-          const row = await createProduct(user.id, payload);
+          const row = await createProduct(user.id, {
+            ...payload,
+            title: deriveTitle(state.projectTitle, state.planText),
+          });
           useProjectStore.getState().setCurrentProductId(row.id);
         }
         window.dispatchEvent(new Event("product-saved"));

@@ -1,12 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus } from "lucide-react";
+import { Menu } from "@base-ui/react/menu";
+import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/lib/store/project-store";
 import { useAuth } from "@/lib/supabase/use-auth";
-import { getProduct, listProducts, type ProductSummary } from "@/lib/supabase/products";
+import {
+  deleteProduct,
+  getProduct,
+  listProducts,
+  renameProduct,
+  type ProductSummary,
+} from "@/lib/supabase/products";
 
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -26,11 +33,16 @@ export function ProductSidebar() {
   const currentProductId = useProjectStore((s) => s.currentProductId);
   const startNewProduct = useProjectStore((s) => s.startNewProduct);
   const loadProduct = useProjectStore((s) => s.loadProduct);
+  const setTitleIsCustom = useProjectStore((s) => s.setTitleIsCustom);
 
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     if (!user) return;
@@ -84,12 +96,50 @@ export function ProductSidebar() {
         slotAnswers: row.slot_answers,
         featureMap: row.feature_map,
         featureFlows: row.feature_flows,
+        titleIsCustom: row.title_is_custom,
       });
       router.push(row.generated_files.length > 0 ? "/learn" : "/plan");
     } catch (err) {
       setError(err instanceof Error ? err.message : "読み込みに失敗しました");
     } finally {
       setLoadingId(null);
+    }
+  }
+
+  function handleRenameStart(p: ProductSummary) {
+    setDeleteConfirmId(null);
+    setRenamingId(p.id);
+    setRenameValue(p.title);
+    // メニューを閉じた直後にinputへフォーカスするため、次のtickで実行する。
+    requestAnimationFrame(() => renameInputRef.current?.focus());
+  }
+
+  async function handleRenameConfirm(id: string) {
+    const title = renameValue.trim();
+    setRenamingId(null);
+    if (!title) return;
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, title } : p)));
+    try {
+      await renameProduct(id, title);
+      if (id === currentProductId) setTitleIsCustom(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "名前の変更に失敗しました");
+      void refresh();
+    }
+  }
+
+  async function handleDelete(id: string) {
+    setDeleteConfirmId(null);
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+    try {
+      await deleteProduct(id);
+      if (id === currentProductId) {
+        startNewProduct();
+        router.push("/plan");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "削除に失敗しました");
+      void refresh();
     }
   }
 
@@ -114,21 +164,89 @@ export function ProductSidebar() {
           </p>
         )}
         {products.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => void handleSelect(p.id)}
-            disabled={loadingId === p.id}
-            className={cn(
-              "w-full rounded-md px-2.5 py-2 text-left text-sm transition-colors",
-              p.id === currentProductId
-                ? "bg-background font-medium"
-                : "text-foreground/80 hover:bg-background/60"
+          <div key={p.id} className="group relative">
+            {renamingId === p.id ? (
+              <div className="rounded-md bg-background px-2.5 py-2">
+                <input
+                  ref={renameInputRef}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void handleRenameConfirm(p.id);
+                    if (e.key === "Escape") setRenamingId(null);
+                  }}
+                  onBlur={() => void handleRenameConfirm(p.id)}
+                  className="w-full bg-transparent text-sm outline-none"
+                />
+              </div>
+            ) : deleteConfirmId === p.id ? (
+              <div className="space-y-1.5 rounded-md bg-background px-2.5 py-2">
+                <p className="text-xs text-destructive">削除しますか?元に戻せません。</p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(p.id)}
+                    className="text-xs font-medium text-destructive hover:underline"
+                  >
+                    削除する
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteConfirmId(null)}
+                    className="text-xs text-muted-foreground hover:underline"
+                  >
+                    キャンセル
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void handleSelect(p.id)}
+                disabled={loadingId === p.id}
+                className={cn(
+                  "w-full rounded-md py-2 pr-8 pl-2.5 text-left text-sm transition-colors",
+                  p.id === currentProductId
+                    ? "bg-background font-medium"
+                    : "text-foreground/80 hover:bg-background/60"
+                )}
+              >
+                <p className="truncate">{loadingId === p.id ? "読み込み中…" : p.title}</p>
+                <p className="text-xs text-muted-foreground">{formatRelativeTime(p.updated_at)}</p>
+              </button>
             )}
-          >
-            <p className="truncate">{loadingId === p.id ? "読み込み中…" : p.title}</p>
-            <p className="text-xs text-muted-foreground">{formatRelativeTime(p.updated_at)}</p>
-          </button>
+
+            {renamingId !== p.id && deleteConfirmId !== p.id && (
+              <Menu.Root>
+                <Menu.Trigger
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute top-1/2 right-1 -translate-y-1/2 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/10 group-hover:opacity-100"
+                >
+                  <MoreVertical className="size-4" />
+                </Menu.Trigger>
+                <Menu.Portal>
+                  <Menu.Positioner side="bottom" align="end" sideOffset={4}>
+                    <Menu.Popup className="min-w-32 rounded-lg bg-popover p-1 text-sm text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none">
+                      <Menu.Item
+                        onClick={() => handleRenameStart(p)}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 outline-none data-[highlighted]:bg-muted"
+                      >
+                        <Pencil className="size-3.5" />
+                        名前を変更
+                      </Menu.Item>
+                      <Menu.Item
+                        onClick={() => setDeleteConfirmId(p.id)}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-destructive outline-none data-[highlighted]:bg-destructive/10"
+                      >
+                        <Trash2 className="size-3.5" />
+                        削除
+                      </Menu.Item>
+                    </Menu.Popup>
+                  </Menu.Positioner>
+                </Menu.Portal>
+              </Menu.Root>
+            )}
+          </div>
         ))}
         {error && <p className="px-2 py-1 text-xs text-destructive">{error}</p>}
       </div>

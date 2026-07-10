@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -171,6 +171,37 @@ export function LearnWorkspace() {
     }
   }
 
+  // ファイルを開いたら手動クリック不要で自動的にブロック分解する。
+  const chunkRequestedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!isLearnableFile || !currentFile || chunked) return;
+    if (chunkRequestedRef.current.has(currentFile.path)) return;
+    chunkRequestedRef.current.add(currentFile.path);
+    handleChunk();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLearnableFile, currentFile?.path, chunked]);
+
+  /** 分解に失敗したファイルを再試行できるよう、リクエスト済みマークを消してやり直す。 */
+  function handleRetryChunk() {
+    if (currentFile) chunkRequestedRef.current.delete(currentFile.path);
+    handleChunk();
+  }
+
+  // コードが生成されたら手動クリック不要で自動的に機能マップを解析する。
+  const featureMapRequestedRef = useRef(false);
+  useEffect(() => {
+    if (!supportsFeatureMap || featureMap || learnableFiles.length === 0) return;
+    if (featureMapRequestedRef.current) return;
+    featureMapRequestedRef.current = true;
+    handleAnalyzeFeatures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportsFeatureMap, featureMap, learnableFiles.length]);
+
+  function handleRetryAnalyzeFeatures() {
+    featureMapRequestedRef.current = false;
+    handleAnalyzeFeatures();
+  }
+
   if (generatedFiles.length === 0) {
     return (
       <Card>
@@ -232,18 +263,22 @@ export function LearnWorkspace() {
           <CardHeader>
             <CardTitle>{currentFile.path}</CardTitle>
             <CardDescription>
-              このファイルをブロック穴埋め形式に分解して学習を始めます。
+              {chunkError ? "分解に失敗しました。" : "このファイルを自動でブロック穴埋め形式に分解しています…"}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Button onClick={handleChunk} disabled={isChunking}>
-              {isChunking ? "分解中…" : "この単元を解析する"}
-            </Button>
-            {chunkError && (
-              <Alert variant="destructive">
-                <AlertTitle>分解に失敗しました</AlertTitle>
-                <AlertDescription>{chunkError}</AlertDescription>
-              </Alert>
+            {chunkError ? (
+              <>
+                <Alert variant="destructive">
+                  <AlertTitle>分解に失敗しました</AlertTitle>
+                  <AlertDescription>{chunkError}</AlertDescription>
+                </Alert>
+                <Button onClick={handleRetryChunk} disabled={isChunking}>
+                  {isChunking ? "分解中…" : "もう一度試す"}
+                </Button>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">分解中…</p>
             )}
           </CardContent>
         </Card>
@@ -314,14 +349,18 @@ export function LearnWorkspace() {
 
             {supportsFeatureMap && !featureMap && (
               <div className="space-y-2">
-                <Button onClick={handleAnalyzeFeatures} disabled={isAnalyzingFeatures}>
-                  {isAnalyzingFeatures ? "解析中…" : "機能マップを解析する"}
-                </Button>
-                {analyzeFeatureError && (
-                  <Alert variant="destructive">
-                    <AlertTitle>解析に失敗しました</AlertTitle>
-                    <AlertDescription>{analyzeFeatureError}</AlertDescription>
-                  </Alert>
+                {analyzeFeatureError ? (
+                  <>
+                    <Alert variant="destructive">
+                      <AlertTitle>解析に失敗しました</AlertTitle>
+                      <AlertDescription>{analyzeFeatureError}</AlertDescription>
+                    </Alert>
+                    <Button onClick={handleRetryAnalyzeFeatures} disabled={isAnalyzingFeatures}>
+                      {isAnalyzingFeatures ? "解析中…" : "もう一度試す"}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">機能マップを自動で解析しています…</p>
                 )}
               </div>
             )}
