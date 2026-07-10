@@ -19,6 +19,18 @@ const ROLE_LABEL: Record<string, string> = {
   util: "ロジック",
 };
 
+/** 役割ごとにカードの色を変え、ひと目で種類を見分けられるようにする。 */
+const ROLE_COLOR: Record<string, { border: string; bg: string; text: string }> = {
+  screen: { border: "border-sky-400", bg: "bg-sky-100", text: "text-sky-700" },
+  component: { border: "border-violet-400", bg: "bg-violet-100", text: "text-violet-700" },
+  hook: { border: "border-amber-400", bg: "bg-amber-100", text: "text-amber-700" },
+  state: { border: "border-blue-400", bg: "bg-blue-100", text: "text-blue-700" },
+  db: { border: "border-emerald-400", bg: "bg-emerald-100", text: "text-emerald-700" },
+  api: { border: "border-rose-400", bg: "bg-rose-100", text: "text-rose-700" },
+  util: { border: "border-slate-400", bg: "bg-slate-100", text: "text-slate-700" },
+};
+const DEFAULT_ROLE_COLOR = ROLE_COLOR.util;
+
 /** どの技術のアイコンを出すか(DBはsupabase風の緑、それ以外はreact/next寄り)。ラベルから推測。 */
 function iconNameFor(label: string, role: string): string {
   const l = label.toLowerCase();
@@ -156,27 +168,73 @@ export function WiringCanvas({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
-      {/* 線(SVG) */}
-      <svg className="pointer-events-none absolute inset-0 h-full w-full">
+      {/* 線(SVG)。背景に馴染んで見えにくかったため、白いハロー(縁取り)+太い線+矢印+
+          大きめの番号バッジにして、どのカード同士がつながったか一目でわかるようにする。
+          隣接カード同士をつなぐ線がカードの下に隠れないよう、z-indexでカードより手前に出す。 */}
+      <svg className="pointer-events-none absolute inset-0 z-10 h-full w-full overflow-visible">
+        <defs>
+          {/* Safariのcontext-stroke対応が不安なため、色ごとに矢印マーカーを固定で用意する。 */}
+          <marker
+            id="wiring-arrow-call"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto-start-reverse"
+          >
+            <path d="M1 1L9 5L1 9Z" fill="var(--brand-blue)" />
+          </marker>
+          <marker
+            id="wiring-arrow-return"
+            viewBox="0 0 10 10"
+            refX="8"
+            refY="5"
+            markerWidth="7"
+            markerHeight="7"
+            orient="auto-start-reverse"
+          >
+            <path d="M1 1L9 5L1 9Z" fill="var(--brand-pink)" />
+          </marker>
+        </defs>
         {doneLines.map((step) => {
           const a = nodeCenter(step.fromId);
           const b = nodeCenter(step.toId);
           if (!a || !b) return null;
           const color = step.kind === "call" ? "var(--brand-blue)" : "var(--brand-pink)";
+          const markerId = step.kind === "call" ? "wiring-arrow-call" : "wiring-arrow-return";
+          // ノードが増えると直線同士が重なって見分けにくくなるため、線ごとに
+          // わずかにカーブさせる(stepIdから決定的に向きを決め、毎回同じ形になるようにする)。
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const len = Math.hypot(dx, dy) || 1;
+          const seed = step.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+          const bend = Math.min(36, len * 0.18) * (seed % 2 === 0 ? 1 : -1);
           const mx = (a.x + b.x) / 2;
           const my = (a.y + b.y) / 2;
+          const cx = mx + (-dy / len) * bend;
+          const cy = my + (dx / len) * bend;
+          const pathD = `M ${a.x} ${a.y} Q ${cx} ${cy} ${b.x} ${b.y}`;
+          // 二次ベジェ曲線の中点(バッジを線上に正しく置くため、単純な中点ではなくこちらを使う)。
+          const curveMidX = 0.25 * a.x + 0.5 * cx + 0.25 * b.x;
+          const curveMidY = 0.25 * a.y + 0.5 * cy + 0.25 * b.y;
           return (
             <g key={step.id}>
-              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={color} strokeWidth={2.5} />
-              <circle r={4} fill={color}>
-                <animateMotion
-                  dur="2s"
-                  repeatCount="indefinite"
-                  path={`M ${a.x} ${a.y} L ${b.x} ${b.y}`}
-                />
+              {/* 白いハロー: 線がカードやテキストの上を通っても埋もれないようにする */}
+              <path d={pathD} stroke="white" strokeWidth={8} strokeLinecap="round" fill="none" />
+              <path
+                d={pathD}
+                stroke={color}
+                strokeWidth={4}
+                strokeLinecap="round"
+                fill="none"
+                markerEnd={`url(#${markerId})`}
+              />
+              <circle r={5} fill={color} stroke="white" strokeWidth={2}>
+                <animateMotion dur="2s" repeatCount="indefinite" path={pathD} />
               </circle>
-              <circle cx={mx} cy={my} r={10} fill={color} />
-              <text x={mx} y={my + 4} textAnchor="middle" fontSize={11} fill="#fff" fontWeight={700}>
+              <circle cx={curveMidX} cy={curveMidY} r={14} fill={color} stroke="white" strokeWidth={2.5} />
+              <text x={curveMidX} y={curveMidY + 5} textAnchor="middle" fontSize={13} fill="#fff" fontWeight={700}>
                 {completedSteps.indexOf(feature.steps.indexOf(step)) + 1}
               </text>
             </g>
@@ -184,15 +242,27 @@ export function WiringCanvas({
         })}
         {/* ドラッグ中の仮線 */}
         {dragCenter && pointer && (
-          <line
-            x1={dragCenter.x}
-            y1={dragCenter.y}
-            x2={pointer.x}
-            y2={pointer.y}
-            stroke="var(--brand-blue)"
-            strokeWidth={2}
-            strokeDasharray="5 4"
-          />
+          <>
+            <line
+              x1={dragCenter.x}
+              y1={dragCenter.y}
+              x2={pointer.x}
+              y2={pointer.y}
+              stroke="white"
+              strokeWidth={6}
+              strokeLinecap="round"
+            />
+            <line
+              x1={dragCenter.x}
+              y1={dragCenter.y}
+              x2={pointer.x}
+              y2={pointer.y}
+              stroke="var(--brand-blue)"
+              strokeWidth={3}
+              strokeLinecap="round"
+              strokeDasharray="7 5"
+            />
+          </>
         )}
       </svg>
 
@@ -202,6 +272,7 @@ export function WiringCanvas({
           const step = activeStepIndex >= 0 ? feature.steps[activeStepIndex] : null;
           const isNextSource = step?.fromId === node.id && !dragFrom;
           const isHintTarget = !!dragFrom && step?.fromId === dragFrom && step?.toId === node.id;
+          const roleColor = ROLE_COLOR[node.role] ?? DEFAULT_ROLE_COLOR;
           return (
             <div
               key={node.id}
@@ -210,10 +281,11 @@ export function WiringCanvas({
               }}
               onPointerDown={(e) => handlePointerDown(e, node.id)}
               className={cn(
-                "absolute w-[min(78vw,18rem)] -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-xl border-2 border-pink-300 bg-pink-100 shadow-sm transition-all active:cursor-grabbing",
+                "absolute w-[min(78vw,18rem)] -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-xl border-2 bg-white shadow-md transition-all active:cursor-grabbing",
+                roleColor.border,
                 compact ? "p-2" : "p-3",
-                isNextSource && "ring-2 ring-offset-1",
-                isHintTarget && "scale-105 ring-2",
+                isNextSource && "ring-4 ring-offset-2",
+                isHintTarget && "scale-105 ring-4",
                 wrongFlash && dragFrom === node.id && "animate-pulse"
               )}
               style={{
@@ -224,7 +296,14 @@ export function WiringCanvas({
                   : {}),
               }}
             >
-              <p className={cn("flex items-center gap-2 font-bold", compact ? "text-sm" : "text-base")}>
+              <p
+                className={cn(
+                  "-mx-3 -mt-3 mb-2 flex items-center gap-2 rounded-t-[10px] px-3 py-1.5 font-bold",
+                  roleColor.bg,
+                  roleColor.text,
+                  compact ? "text-sm" : "text-base"
+                )}
+              >
                 <TechIcon name={iconNameFor(node.label, node.role)} size={compact ? 14 : 18} />
                 <span className="truncate">{node.label}</span>
               </p>

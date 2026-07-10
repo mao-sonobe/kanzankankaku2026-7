@@ -53,14 +53,6 @@ export default function Home() {
           <Button size="lg" nativeButton={false} render={<Link href="/plan" />}>
             はじめる
           </Button>
-          <Button
-            size="lg"
-            variant="outline"
-            nativeButton={false}
-            render={<Link href="/settings" />}
-          >
-            AI設定を確認する
-          </Button>
         </div>
       </section>
 
