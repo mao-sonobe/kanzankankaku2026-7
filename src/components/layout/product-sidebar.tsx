@@ -43,6 +43,11 @@ export function ProductSidebar() {
   const setTitleIsCustom = useProjectStore((s) => s.setTitleIsCustom);
 
   const [collapsed, setCollapsed] = useState(false);
+
+  // スマホ幅では、開いたままだと本文がほぼ隠れてしまうため、初期表示は閉じておく。
+  useEffect(() => {
+    if (window.innerWidth < 768) setCollapsed(true);
+  }, []);
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);

@@ -8,6 +8,26 @@ import type { ExecutionFile, ExecutionLogListener, ExecutionProvider } from "./t
 let bootPromise: Promise<WebContainer> | null = null;
 let devServerUrl: string | null = null;
 
+/**
+ * WebContainerはモバイル端末など非力な環境だと起動やnpm installが完了せず
+ * 無言のまま固まることがあるため、一定時間で必ずエラーとして打ち切る。
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (err) => {
+        clearTimeout(timer);
+        reject(err);
+      }
+    );
+  });
+}
+
 function toFileSystemTree(files: ExecutionFile[]): FileSystemTree {
   const tree: FileSystemTree = {};
 
@@ -41,7 +61,11 @@ export class WebContainerExecutionProvider implements ExecutionProvider {
       onLog?.("WebContainerを起動しています…");
       bootPromise = WebContainer.boot();
     }
-    this.container = await bootPromise;
+    this.container = await withTimeout(
+      bootPromise,
+      30_000,
+      "実行環境の起動がタイムアウトしました。お使いの端末・ブラウザでは動作しない可能性があります。"
+    );
   }
 
   private ensureContainer(): WebContainer {
@@ -71,7 +95,11 @@ export class WebContainerExecutionProvider implements ExecutionProvider {
         },
       })
     );
-    const installExitCode = await install.exit;
+    const installExitCode = await withTimeout(
+      install.exit,
+      120_000,
+      "依存関係のインストールがタイムアウトしました。回線状況や端末の性能によって時間がかかりすぎている可能性があります。"
+    );
     if (installExitCode !== 0) {
       throw new Error(`npm install が失敗しました (exit code: ${installExitCode})`);
     }
@@ -86,15 +114,13 @@ export class WebContainerExecutionProvider implements ExecutionProvider {
       })
     );
 
-    const url = await new Promise<string>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new Error("開発サーバーの起動がタイムアウトしました"));
-      }, 60_000);
-      container.on("server-ready", (_port, serverUrl) => {
-        clearTimeout(timeout);
-        resolve(serverUrl);
-      });
-    });
+    const url = await withTimeout(
+      new Promise<string>((resolve) => {
+        container.on("server-ready", (_port, serverUrl) => resolve(serverUrl));
+      }),
+      60_000,
+      "開発サーバーの起動がタイムアウトしました"
+    );
 
     devServerUrl = url;
     return url;
