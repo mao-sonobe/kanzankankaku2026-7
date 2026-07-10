@@ -10,18 +10,13 @@ import { Badge } from "@/components/ui/badge";
 import { TechIcon } from "@/components/ui/tech-icon";
 import { useProjectStore } from "@/lib/store/project-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
-import { getExecutionProvider } from "@/lib/execution/webcontainer-provider";
 import { getScaffoldFiles } from "@/lib/generated-app/scaffold";
 
-type Phase = "idle" | "generating" | "booting" | "installing" | "running" | "ready" | "error";
+type Phase = "idle" | "generating" | "error";
 
 const PHASE_LABEL: Record<Phase, string> = {
   idle: "準備しています…",
   generating: "AIがコードを生成しています…",
-  booting: "実行環境を起動しています…",
-  installing: "依存関係をインストールしています…",
-  running: "アプリを起動しています…",
-  ready: "完了しました。移動します…",
   error: "エラーが発生しました",
 };
 
@@ -32,54 +27,17 @@ export function BuildWorkspace() {
   const generatedFiles = useProjectStore((s) => s.generatedFiles);
   const setGeneratedFiles = useProjectStore((s) => s.setGeneratedFiles);
   const isPregenerating = useProjectStore((s) => s.isPregenerating);
-  const previewUrl = useProjectStore((s) => s.previewUrl);
-  const setPreviewUrl = useProjectStore((s) => s.setPreviewUrl);
 
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [logs, setLogs] = useState<string[]>([]);
-  const [showLogs, setShowLogs] = useState(false);
-  const logsEndRef = useRef<HTMLDivElement>(null);
   const startedRef = useRef(false);
 
-  function appendLog(raw: string) {
-    // npmの進捗表示に含まれるANSI制御シーケンス(CSI/OSC)やスピナー用の点字文字(⠋⠙⠹…)を
-    // 取り除かないと、謎の記号だけが並んだログになってしまう。
-    const lines = raw
-      .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)/g, "")
-      .replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, "")
-      .replace(/\x1b[()][A-Za-z0-9]/g, "")
-      .replace(/\x1b/g, "")
-      .replace(/[⠀-⣿]/g, "")
-      .split(/\r\n|\r|\n/)
-      .map((l) => l.trim())
-      .filter(Boolean);
-    if (lines.length === 0) return;
-    setLogs((prev) => [...prev, ...lines].slice(-300));
-    queueMicrotask(() => logsEndRef.current?.scrollIntoView({ block: "end" }));
-  }
-
-  async function runInWebContainer(files: typeof generatedFiles) {
-    setPhase("booting");
-    const execution = getExecutionProvider();
-    await execution.boot(appendLog);
-    await execution.mountFiles(files);
-
-    setPhase("installing");
-    const url = await execution.installAndRun((line) => {
-      appendLog(line);
-      if (line.includes("npm run dev") || /Local:\s*http/i.test(line)) {
-        setPhase("running");
-      }
-    });
-    setPreviewUrl(url);
-    setPhase("ready");
-  }
-
-  async function handleGenerateAndRun() {
+  // コード生成だけをここで行い、完了したらすぐにコード理解画面へ移動する。
+  // 依存関係のインストール(WebContainer起動)はスマホだと時間がかかるため、
+  // ここでは待たずコード理解画面側の自動起動に任せる。
+  async function handleGenerate() {
     if (!stackProposal) return;
     setError(null);
-    setLogs([]);
     setPhase("generating");
     try {
       const provider = getAIProvider();
@@ -91,18 +49,7 @@ export function BuildWorkspace() {
       const aiPaths = new Set(result.files.map((f) => f.path));
       const merged = [...scaffold.filter((f) => !aiPaths.has(f.path)), ...result.files];
       setGeneratedFiles(merged);
-      await runInWebContainer(merged);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "予期しないエラーが発生しました");
-      setPhase("error");
-    }
-  }
-
-  async function handleResume() {
-    setError(null);
-    setLogs([]);
-    try {
-      await runInWebContainer(generatedFiles);
+      router.replace("/learn");
     } catch (err) {
       setError(err instanceof Error ? err.message : "予期しないエラーが発生しました");
       setPhase("error");
@@ -110,27 +57,19 @@ export function BuildWorkspace() {
   }
 
   // 生成されたコードの全文をここで見せてしまうと、穴埋め学習の前に答えを見せることになるため、
-  // コード生成〜WebContainer起動は裏側で自動的に走らせ、完了したらコード理解画面へ自動遷移する。
+  // コード生成は裏側で自動的に走らせ、完了したらコード理解画面へ自動遷移する。
   useEffect(() => {
     if (!stackProposal || startedRef.current) return;
     // クイズ中の先回し生成がまだ走っている場合は、二重生成を避けて完了(generatedFiles反映)を待つ。
     if (isPregenerating && generatedFiles.length === 0) return;
     startedRef.current = true;
-    if (previewUrl) {
+    if (generatedFiles.length > 0) {
       router.replace("/learn");
-    } else if (generatedFiles.length > 0) {
-      void handleResume();
     } else {
-      void handleGenerateAndRun();
+      void handleGenerate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stackProposal, previewUrl, generatedFiles, isPregenerating, router]);
-
-  useEffect(() => {
-    if (phase === "ready" && previewUrl) {
-      router.replace("/learn");
-    }
-  }, [phase, previewUrl, router]);
+  }, [stackProposal, generatedFiles, isPregenerating, router]);
 
   if (!stackProposal) {
     return (
@@ -156,7 +95,7 @@ export function BuildWorkspace() {
         <CardHeader>
           <CardTitle>アプリを準備しています</CardTitle>
           <CardDescription>
-            AIがコードを生成し、実行環境を起動しています。完了すると自動的にコード理解画面に移動します(数分かかることがあります)。
+            AIがコードを生成しています。完了すると自動的にコード理解画面に移動します。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -170,9 +109,7 @@ export function BuildWorkspace() {
           </div>
 
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            {phase !== "error" && phase !== "ready" && (
-              <span className="size-2 animate-pulse rounded-full bg-primary" />
-            )}
+            {phase !== "error" && <span className="size-2 animate-pulse rounded-full bg-primary" />}
             {PHASE_LABEL[phase]}
           </div>
 
@@ -182,32 +119,11 @@ export function BuildWorkspace() {
                 <AlertTitle>エラーが発生しました</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
-              <Button onClick={() => void handleGenerateAndRun()}>もう一度試す</Button>
+              <Button onClick={() => void handleGenerate()}>もう一度試す</Button>
             </>
           )}
         </CardContent>
       </Card>
-
-      {logs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <span>実行ログ</span>
-              <Button variant="ghost" size="sm" onClick={() => setShowLogs((v) => !v)}>
-                {showLogs ? "隠す" : "詳細を表示"}
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          {showLogs && (
-            <CardContent>
-              <pre className="max-h-48 overflow-auto rounded-md border bg-black p-3 text-xs text-green-400">
-                {logs.join("\n")}
-                <div ref={logsEndRef} />
-              </pre>
-            </CardContent>
-          )}
-        </Card>
-      )}
     </div>
   );
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +12,7 @@ import { DEFAULT_AI_SETTINGS, OPENAI_DEFAULT_MODEL, loadAISettings, saveAISettin
 import type { AIProviderKind } from "@/lib/ai/types";
 import { useAuth } from "@/lib/supabase/use-auth";
 import { createClient } from "@/lib/supabase/client";
+import { useProjectStore } from "@/lib/store/project-store";
 
 type ConnectionState =
   | { status: "idle" }
@@ -21,7 +21,6 @@ type ConnectionState =
   | { status: "error"; message: string };
 
 export default function SettingsPage() {
-  const router = useRouter();
   const { user } = useAuth();
   const [provider, setProvider] = useState<AIProviderKind>(DEFAULT_AI_SETTINGS.provider);
   const [endpoint, setEndpoint] = useState(DEFAULT_AI_SETTINGS.endpoint);
@@ -40,7 +39,15 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!data.ok) throw new Error(data.error ?? "アカウントの削除に失敗しました");
       await createClient().auth.signOut();
-      router.push("/login");
+      // ローカルのストア(IndexedDB永続化)はユーザーをまたいで共有されているため、
+      // ここでリセットしないと次にログインした別アカウント/ゲストにも
+      // 削除したアカウントのチャット内容が残って見えてしまう。
+      useProjectStore.getState().startNewProduct();
+      // リセットのIndexedDBへの書き込み(非同期)がページ遷移で打ち切られないよう一呼吸置く。
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      // router.push(クライアント側遷移)だとセッションCookie失効のタイミングと
+      // middlewareのチェックがずれることがあるため、ハードナビゲーションにする。
+      window.location.href = "/login";
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : "アカウントの削除に失敗しました");
       setIsDeleting(false);

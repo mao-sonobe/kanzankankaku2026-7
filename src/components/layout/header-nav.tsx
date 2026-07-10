@@ -2,22 +2,30 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Library, LogOut, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WizardSteps } from "@/components/plan/wizard-steps";
 import { useAuth } from "@/lib/supabase/use-auth";
 import { createClient } from "@/lib/supabase/client";
+import { useProjectStore } from "@/lib/store/project-store";
 
 export function HeaderNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user } = useAuth();
 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push("/login");
+    // ローカルのストア(IndexedDB永続化)はユーザーをまたいで共有されているため、
+    // ここでリセットしないと次にログインした別アカウント/ゲストにも
+    // 前のユーザーのチャット内容が残って見えてしまう。
+    useProjectStore.getState().startNewProduct();
+    // リセットのIndexedDBへの書き込み(非同期)がページ遷移で打ち切られないよう一呼吸置く。
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    // router.push(クライアント側遷移)だとセッションCookie失効のタイミングと
+    // middlewareのチェックがずれることがあるため、ハードナビゲーションにする。
+    window.location.href = "/login";
   }
 
   return (

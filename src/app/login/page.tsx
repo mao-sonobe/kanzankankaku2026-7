@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +11,6 @@ import { createClient } from "@/lib/supabase/client";
 type Status = { kind: "idle" } | { kind: "sent" } | { kind: "error"; message: string };
 
 export default function LoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [isSendingLink, setIsSendingLink] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -63,10 +61,12 @@ export default function LoginPage() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInAnonymously();
       if (error) throw error;
-      router.push("/plan");
+      // router.push(クライアント側遷移)だと、セッションCookieの反映が
+      // middlewareのチェックに間に合わずログイン前のページへ戻されることがあるため、
+      // 確実に最新のCookieを読ませるハードナビゲーションにする。
+      window.location.href = "/plan";
     } catch (err) {
       setStatus({ kind: "error", message: err instanceof Error ? err.message : "ログインに失敗しました" });
-    } finally {
       setIsGuestLoading(false);
     }
   }
