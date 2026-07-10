@@ -1,12 +1,13 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Ear, FileCode2, Lightbulb, Waypoints } from "lucide-react";
+import { BookOpen, Ear, Lightbulb, Waypoints } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
 
-// ①企画チャット ②カードクイズ ③配線パズル ④コード生成(/build) ⑤コード理解(/learn)
-// この番号がアプリ全体で唯一の「現在地」表示。各ページの見出しには重複して番号を書かない。
+// 企画チャット→技術クイズ→配線パズル→コード理解。
+// コード生成(/build)はユーザー操作を伴わない自動処理(裏側で生成してすぐ/learnへ
+// 遷移する)なので、ナビ上のステップとしては表示しない。
 const STEPS: {
   icon: typeof BookOpen;
   label: string;
@@ -16,7 +17,6 @@ const STEPS: {
   { icon: Ear, label: "企画チャット", planStep: 1 },
   { icon: BookOpen, label: "技術クイズ", planStep: 2 },
   { icon: Waypoints, label: "配線パズル", planStep: 3 },
-  { icon: FileCode2, label: "コード生成", href: "/build" },
   { icon: Lightbulb, label: "コード理解", href: "/learn" },
 ];
 
@@ -43,7 +43,6 @@ export function WizardSteps() {
 
   function isReachable(planStepOf?: PlanStep, href?: string): boolean {
     if (planStepOf !== undefined) return planStepOf <= maxPlanReached;
-    if (href === "/build") return !!stackProposal;
     if (href === "/learn") return hasCode;
     return false;
   }
@@ -84,15 +83,6 @@ export function WizardSteps() {
                 : undefined,
             }}
           >
-            <span
-              className={cn(
-                "absolute top-0.5 left-2 font-mono text-[10px] leading-none",
-                active ? "font-semibold" : "opacity-60"
-              )}
-              style={active ? { color: "var(--brand-pink)" } : undefined}
-            >
-              {i + 1}
-            </span>
             <Icon className="size-5" style={active ? { color: "var(--brand-pink)" } : undefined} />
           </button>
         );
