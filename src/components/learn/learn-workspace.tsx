@@ -176,7 +176,7 @@ export function LearnWorkspace() {
       <Card>
         <CardHeader>
           <CardTitle>生成されたコードがありません</CardTitle>
-          <CardDescription>先に④でコードを生成してください。</CardDescription>
+          <CardDescription>先にコード生成画面でコードを生成してください。</CardDescription>
         </CardHeader>
         <CardContent>
           <Button nativeButton={false} render={<Link href="/build" />}>
@@ -378,7 +378,7 @@ export function LearnWorkspace() {
             <CardDescription>
               {previewUrl
                 ? "ブロックを埋めるとここに反映されます。"
-                : "②でプレビューを起動すると表示されます。"}
+                : "コード生成画面でプレビューを起動すると表示されます。"}
             </CardDescription>
           </CardHeader>
           <CardContent>

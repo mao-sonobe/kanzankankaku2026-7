@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
 
 // ①企画チャット ②カードクイズ ③配線パズル ④コード生成(/build) ⑤コード理解(/learn)
+// この番号がアプリ全体で唯一の「現在地」表示。各ページの見出しには重複して番号を書かない。
 const STEPS: {
   icon: typeof BookOpen;
   label: string;
@@ -83,6 +84,15 @@ export function WizardSteps() {
                 : undefined,
             }}
           >
+            <span
+              className={cn(
+                "absolute top-0.5 left-2 font-mono text-[10px] leading-none",
+                active ? "font-semibold" : "opacity-60"
+              )}
+              style={active ? { color: "var(--brand-pink)" } : undefined}
+            >
+              {i + 1}
+            </span>
             <Icon className="size-5" style={active ? { color: "var(--brand-pink)" } : undefined} />
           </button>
         );

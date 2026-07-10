@@ -1,15 +1,18 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* 日本語(CJK)フォント。next/font/googleはCJKのサブセットに対応していないため、
+   Google Fonts CDNから直接読み込む(本文=ゴシック、見出し=重厚感のある明朝)。 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Shippori+Mincho:wght@500;600;800&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  --font-sans: "Noto Sans JP", ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: "Shippori Mincho", "Noto Sans JP", ui-serif, serif;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -126,8 +129,18 @@
   }
   body {
     @apply bg-background text-foreground;
+    line-height: 1.75;
   }
   html {
     @apply font-sans;
+    /* 全体的に小さく読みにくいとの声を受け、基準サイズを底上げ(rem基準のTailwindクラス全体に反映される)。 */
+    font-size: 18px;
+  }
+  h1,
+  h2,
+  h3,
+  .font-heading {
+    font-family: var(--font-heading);
+    letter-spacing: 0.02em;
   }
 }
