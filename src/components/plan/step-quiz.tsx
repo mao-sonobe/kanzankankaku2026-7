@@ -105,9 +105,9 @@ export function StepQuiz({
   }, [planText, proposal]);
 
   return (
-    // 画面いっぱいに広げ(フルブリード)、ヘッダー分を除いた高さに収めてスクロールを無くす。
-    // planページのpy-10を-my-10で打ち消してビューポート高にぴったり合わせる。
-    <div className="relative left-1/2 -my-10 h-[calc(100vh-4rem-1px)] w-screen -translate-x-1/2 overflow-hidden">
+    // コンテンツ領域(サイドバーを除いた幅)いっぱいに広げ、
+    // ヘッダー分を除いた高さに収めてスクロールを無くす。
+    <div className="relative h-[calc(100vh-4rem-1px)] w-full overflow-hidden">
       {!complete && (
         <div className="absolute right-4 top-2 z-30">
           <Button variant="ghost" size="sm" onClick={skipQuiz}>
@@ -117,8 +117,8 @@ export function StepQuiz({
       )}
 
       <div className="flex h-full">
-        {/* 左: 回答履歴(画面左端に密着・ゲームカード風) */}
-        <div className="w-[120px] flex-none pt-4">
+        {/* 左: 回答履歴(画面左端に密着・ゲームカード風)。ホバー展開が図の上に来るようz付与 */}
+        <div className="relative z-20 w-[120px] flex-none pt-4">
           <QuizHistory
             items={answeredItems}
             proposal={proposal}
@@ -127,9 +127,10 @@ export function StepQuiz({
           />
         </div>
 
-        {/* 主エリア: 構成図を下地に、カードデッキを重ねて配置(一画面に収める) */}
+        {/* 主エリア: 中央に構成図を下地として置き、その真上にカードデッキを重ねる。
+            カードを答え終わると中央の構成図が現れる。 */}
         <div className="relative flex-1 overflow-hidden">
-          <div className="absolute inset-0 flex items-center p-4">
+          <div className="absolute inset-0 flex items-center justify-center p-4">
             <TechFlowDiagram
               proposal={proposal}
               isRevealed={isRevealed}
@@ -140,7 +141,7 @@ export function StepQuiz({
           </div>
 
           {!complete && currentNode ? (
-            <div className="absolute right-6 top-1/2 z-10 w-[380px] max-w-[42vw] -translate-y-1/2">
+            <div className="absolute left-1/2 top-1/2 z-10 w-[380px] max-w-[42vw] -translate-x-1/2 -translate-y-1/2">
               <QuizDeck
                 node={currentNode}
                 choices={currentChoices}
@@ -149,7 +150,7 @@ export function StepQuiz({
               />
             </div>
           ) : (
-            <div className="absolute right-6 top-1/2 z-10 -translate-y-1/2">
+            <div className="absolute bottom-8 left-1/2 z-20 -translate-x-1/2">
               <Button
                 size="lg"
                 onClick={onNext}

@@ -188,7 +188,8 @@ export function layoutFlowNodes(feature: FeatureFlow): PositionedFlowNode[] {
     // 各行の実際の列数(最終行が欠ける場合は中央寄せ)
     const colsInRow = row === rows - 1 && n % cols !== 0 ? n % cols : cols;
     const xPct = colsInRow === 1 ? 0.5 : 0.18 + (0.64 * col) / (colsInRow - 1);
-    const yPct = rows === 1 ? 0.5 : 0.16 + (0.68 * row) / (rows - 1);
+    // カード(コード抜粋つきで背が高い)が枠の上下で見切れないよう、縦は内側に寄せる。
+    const yPct = rows === 1 ? 0.5 : 0.24 + (0.52 * row) / (rows - 1);
     result.push({ node, xPct, yPct });
   });
   return result;

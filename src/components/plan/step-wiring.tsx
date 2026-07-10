@@ -66,20 +66,6 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
   const activeStepIndex = feature
     ? feature.steps.findIndex((_, i) => !done.includes(i))
     : -1;
-  const currentStep =
-    feature && activeStepIndex >= 0 ? feature.steps[activeStepIndex] : undefined;
-  // 直前に確定したステップ(下部パネルで解説を見せる)
-  const lastStep =
-    feature && done.length > 0 ? feature.steps[done[done.length - 1]] : undefined;
-  const panelStep = currentStep ?? lastStep;
-  const panelStepNo = currentStep
-    ? done.length + 1
-    : done.length; // 完了後は最後の番号
-  // このステップで動くコード(起点ノードの抜粋)
-  const panelSnippet = feature && panelStep
-    ? feature.nodes.find((n) => n.id === panelStep.fromId)?.snippet
-    : undefined;
-  const featureDone = feature ? done.length >= feature.steps.length : false;
   const allDone =
     features.length > 0 &&
     features.every((f) => (progress[f.id] ?? []).length >= f.steps.length);
@@ -147,13 +133,6 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h2 className="text-lg font-medium">配線パズル — データの流れを組み立てよう</h2>
-        <p className="text-sm text-muted-foreground">
-          機能ごとに、データがどのノードからどのノードへ渡るかをドラッグでつなぎましょう。
-        </p>
-      </div>
-
       {/* 機能タブ */}
       <div className="flex flex-wrap gap-2">
         {features.map((f, i) => {
@@ -197,31 +176,6 @@ export function StepWiring({ onBack }: { onBack: () => void }) {
           activeStepIndex={activeStepIndex}
           onConnect={handleConnect}
         />
-      )}
-
-      {/* STEPパネル */}
-      {feature && panelStep && (
-        <div
-          className="rounded-2xl border-2 p-4"
-          style={{ borderColor: "var(--brand-pink)" }}
-        >
-          <p className="text-sm font-semibold">
-            {featureDone ? "✔ " : ""}STEP {panelStepNo} / {feature.steps.length} —{" "}
-            {panelStep.kind === "call" ? "呼び出し(データを渡す)" : "戻り値(結果が返る)"}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed">{panelStep.explanation}</p>
-          <p className="mt-1 text-xs text-muted-foreground">流れるデータ: {panelStep.dataLabel}</p>
-          {panelSnippet && (
-            <pre className="mt-2 overflow-x-auto rounded-lg bg-slate-900 p-3 text-xs text-slate-100">
-              {panelSnippet}
-            </pre>
-          )}
-          {panelStep.uiResult && (
-            <p className="mt-2 rounded-lg bg-pink-50 px-3 py-2 text-xs">
-              画面に出るもの: {panelStep.uiResult}
-            </p>
-          )}
-        </div>
       )}
 
       <div className="flex justify-between pt-2">

@@ -127,13 +127,17 @@ export function WiringCanvas({
   const dragCenter = dragFrom ? nodeCenter(dragFrom) : null;
 
   return (
+    // 配線エリア。高さは画面に合わせて伸ばし、1画面に大きく収める。
     <div
-      ref={containerRef}
-      className="relative h-[480px] w-full touch-none select-none rounded-2xl border-2 bg-pink-50/40"
+      className="flex h-[calc(100vh-21rem)] min-h-[680px] w-full flex-col overflow-hidden rounded-2xl border-2 bg-pink-50/40"
       style={{ borderColor: "var(--brand-pink)" }}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
     >
+      <div
+        ref={containerRef}
+        className="relative min-h-0 flex-1 touch-none select-none"
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
       {/* 線(SVG) */}
       <svg className="pointer-events-none absolute inset-0 h-full w-full">
         {doneLines.map((step) => {
@@ -188,7 +192,7 @@ export function WiringCanvas({
               }}
               onPointerDown={(e) => handlePointerDown(e, node.id)}
               className={cn(
-                "absolute w-44 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-xl border-2 border-pink-300 bg-pink-100 p-2.5 shadow-sm transition-all active:cursor-grabbing",
+                "absolute w-72 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-xl border-2 border-pink-300 bg-pink-100 p-3 shadow-sm transition-all active:cursor-grabbing",
                 isNextSource && "ring-2 ring-offset-1",
                 isHintTarget && "scale-105 ring-2",
                 wrongFlash && dragFrom === node.id && "animate-pulse"
@@ -201,24 +205,34 @@ export function WiringCanvas({
                   : {}),
               }}
             >
-              <p className="flex items-center gap-1.5 text-xs font-bold">
-                <TechIcon name={iconNameFor(node.label, node.role)} size={14} />
+              <p className="flex items-center gap-2 text-base font-bold">
+                <TechIcon name={iconNameFor(node.label, node.role)} size={18} />
                 <span className="truncate">{node.label}</span>
               </p>
-              <p className="mt-0.5 text-[10px] text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-500">
                 {ROLE_LABEL[node.role] ?? node.role}
                 {node.file ? ` ・ ${node.file.split("/").pop()}` : ""}
               </p>
-              <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-slate-600">{node.data}</p>
+              <p className="mt-1 line-clamp-2 text-sm leading-snug text-slate-600">{node.data}</p>
+              {/* このノードの実コード抜粋。コード部分はドラッグを始めずにスクロールできるようにする */}
+              {node.snippet && (
+                <pre
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="mt-2 max-h-24 cursor-auto overflow-auto rounded-md bg-slate-900 p-2 text-xs leading-snug text-slate-100"
+                >
+                  {node.snippet}
+                </pre>
+              )}
             </div>
           );
         })}
 
-      {activeStepIndex >= 0 && (
-        <p className="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-[11px] text-slate-500">
-          光っているノードから、次にデータを受け取るノードへドラッグしてつなごう
-        </p>
-      )}
+        {activeStepIndex >= 0 && (
+          <p className="pointer-events-none absolute bottom-2 left-0 right-0 text-center text-xs text-slate-500">
+            光っているノードから、次にデータを受け取るノードへドラッグしてつなごう
+          </p>
+        )}
+      </div>
     </div>
   );
 }

@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Menu } from "@base-ui/react/menu";
-import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  MoreVertical,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectStore } from "@/lib/store/project-store";
 import { useAuth } from "@/lib/supabase/use-auth";
@@ -35,6 +42,7 @@ export function ProductSidebar() {
   const loadProduct = useProjectStore((s) => s.loadProduct);
   const setTitleIsCustom = useProjectStore((s) => s.setTitleIsCustom);
 
+  const [collapsed, setCollapsed] = useState(false);
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [isLoadingList, setIsLoadingList] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -143,13 +151,45 @@ export function ProductSidebar() {
     }
   }
 
-  return (
-    <aside className="flex w-64 shrink-0 flex-col border-r bg-[#eef1e2] dark:bg-[#2a2f22]">
-      <div className="p-3">
+  // 閉じているときはスリムなレール表示(開くボタンと新規作成だけ残す)。
+  if (collapsed) {
+    return (
+      <aside className="flex w-12 shrink-0 flex-col items-center gap-1 border-r bg-background py-3">
+        <button
+          type="button"
+          onClick={() => setCollapsed(false)}
+          title="サイドバーを開く"
+          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <PanelLeftOpen className="size-4" />
+        </button>
         <button
           type="button"
           onClick={handleNewProduct}
-          className="flex w-full items-center justify-center gap-1.5 rounded-md border border-foreground/20 bg-background/60 px-3 py-2 text-sm font-medium transition-colors hover:bg-background"
+          title="新規プロダクト"
+          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <Plus className="size-4" />
+        </button>
+      </aside>
+    );
+  }
+
+  return (
+    <aside className="flex w-64 shrink-0 flex-col border-r bg-background">
+      <div className="flex items-center gap-1.5 p-3">
+        <button
+          type="button"
+          onClick={() => setCollapsed(true)}
+          title="サイドバーを閉じる"
+          className="rounded-md p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <PanelLeftClose className="size-4" />
+        </button>
+        <button
+          type="button"
+          onClick={handleNewProduct}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-foreground/20 bg-background px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
         >
           <Plus className="size-4" />
           新規プロダクト
@@ -166,7 +206,7 @@ export function ProductSidebar() {
         {products.map((p) => (
           <div key={p.id} className="group relative">
             {renamingId === p.id ? (
-              <div className="rounded-md bg-background px-2.5 py-2">
+              <div className="rounded-md bg-muted px-2.5 py-2">
                 <input
                   ref={renameInputRef}
                   value={renameValue}
@@ -180,7 +220,7 @@ export function ProductSidebar() {
                 />
               </div>
             ) : deleteConfirmId === p.id ? (
-              <div className="space-y-1.5 rounded-md bg-background px-2.5 py-2">
+              <div className="space-y-1.5 rounded-md bg-muted px-2.5 py-2">
                 <p className="text-xs text-destructive">削除しますか?元に戻せません。</p>
                 <div className="flex gap-3">
                   <button
@@ -207,8 +247,8 @@ export function ProductSidebar() {
                 className={cn(
                   "w-full rounded-md py-2 pr-8 pl-2.5 text-left text-sm transition-colors",
                   p.id === currentProductId
-                    ? "bg-background font-medium"
-                    : "text-foreground/80 hover:bg-background/60"
+                    ? "bg-muted font-medium"
+                    : "text-foreground/80 hover:bg-muted"
                 )}
               >
                 <p className="truncate">{loadingId === p.id ? "読み込み中…" : p.title}</p>

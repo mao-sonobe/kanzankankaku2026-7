@@ -1,5 +1,6 @@
 "use client";
 
+import { type MouseEvent as ReactMouseEvent } from "react";
 import { Check, X } from "lucide-react";
 import { TechIcon } from "@/components/ui/tech-icon";
 import { normalizeWrongAnswers, type StackQuizEntry } from "@/lib/domain/stack-quiz";
@@ -101,9 +102,23 @@ export function QuizHistory({
     return <p className="text-xs text-muted-foreground">答えたカードが積まれます。</p>;
   }
 
+  // カーソルが乗った要素の data-hist-idx から対象カードを大きくする。
+  // これにより「大きいカードの下辺(=次カードのidxを持つハンドオフ帯)」に来ると次が開く。
+  function activateFromEvent(e: ReactMouseEvent) {
+    const el = (e.target as HTMLElement).closest("[data-hist-idx]");
+    if (!el) return;
+    const idx = Number(el.getAttribute("data-hist-idx"));
+    const it = items[idx];
+    if (it) onHoverNode(it.node.id);
+  }
+
   return (
-    <div className="flex flex-col gap-2">
-      {items.map(({ node, entry }) => {
+    <div
+      className="flex flex-col gap-2"
+      onMouseOver={activateFromEvent}
+      onMouseLeave={() => onHoverNode(null)}
+    >
+      {items.map(({ node, entry }, i) => {
         const isWrong = entry.status === "wrong" && !!entry.chosen;
         const chosenReason = isWrong
           ? normalizeWrongAnswers(node).find((w) => w.label === entry.chosen)?.reason
@@ -111,36 +126,15 @@ export function QuizHistory({
         const hovered = hoveredNodeId === node.id;
         const displayTech = isWrong ? entry.chosen! : node.label;
         const flows = flowsFor(node.id);
+        const hasNext = i < items.length - 1;
         return (
-          <div
-            key={node.id}
-            className="relative"
-            onMouseEnter={() => onHoverNode(node.id)}
-            onMouseLeave={() => onHoverNode(null)}
-          >
-            {/* 通常時: 小さいコンパクトなカード(ゲームの札風)。左端が少し見切れる。 */}
-            <div className="overflow-hidden">
+          <div key={node.id} className={cn("relative", hovered && "z-40")}>
+            {hovered ? (
+              /* ホバー時: その場で大きく展開。縦に伸びるので下のカードは押し下げられてズレる
+                 (覆い隠さない)。幅は右方向へ図の上にせり出す。 */
               <div
-                className={cn(
-                  "-ml-4 flex w-[calc(100%+1rem)] items-center gap-1 rounded-lg border border-pink-200 bg-pink-100 py-1.5 pl-5 pr-2 shadow-sm transition-opacity",
-                  hovered && "opacity-0"
-                )}
-              >
-                <TechIcon name={displayTech} size={13} />
-                <span className="truncate text-xs font-bold">{displayTech}</span>
-                <span className="ml-auto flex-none">
-                  <ResultMark correct={!isWrong} />
-                </span>
-              </div>
-            </div>
-
-            {/* ホバー時: 大きく展開(クリップ外なので全文+やり取りデータが見える) */}
-            {hovered && (
-              <div
-                className={cn(
-                  "absolute left-0 top-0 z-40 flex gap-2",
-                  isWrong ? "w-[440px]" : "w-[240px]"
-                )}
+                data-hist-idx={i}
+                className={cn("relative flex gap-2", isWrong ? "w-[440px]" : "w-[240px]")}
               >
                 {isWrong ? (
                   <>
@@ -159,6 +153,22 @@ export function QuizHistory({
                 ) : (
                   <DetailCard tech={node.label} correct text={node.description} flows={flows} />
                 )}
+                {/* 下辺のハンドオフ帯: ここにカーソルが来たら次のカードが大きくなる
+                   (大きいカードの下に真っ直ぐ降りても次を開けるように、カード幅いっぱい) */}
+                {hasNext && (
+                  <div data-hist-idx={i + 1} className="absolute inset-x-0 bottom-0 h-9" />
+                )}
+              </div>
+            ) : (
+              /* 通常時: 小さいコンパクトなカード(ゲームの札風)。左端が少し見切れる。 */
+              <div data-hist-idx={i} className="overflow-hidden">
+                <div className="-ml-4 flex w-[calc(100%+1rem)] items-center gap-1 rounded-lg border border-pink-200 bg-pink-100 py-1.5 pl-5 pr-2 shadow-sm">
+                  <TechIcon name={displayTech} size={13} />
+                  <span className="truncate text-xs font-bold">{displayTech}</span>
+                  <span className="ml-auto flex-none">
+                    <ResultMark correct={!isWrong} />
+                  </span>
+                </div>
               </div>
             )}
           </div>

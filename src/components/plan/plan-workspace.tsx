@@ -124,8 +124,17 @@ export function PlanWorkspace() {
     }
   }
 
+  // ②カードクイズは構成図を大きく見せたいので、幅制限なしでコンテンツ領域いっぱいに使う。
+  if (planStep === 2) {
+    return stackProposal ? (
+      <StepQuiz proposal={stackProposal} onNext={() => setPlanStep(3)} />
+    ) : (
+      <p className="px-6 py-10 text-sm text-muted-foreground">技術スタックを準備しています…</p>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-6 py-10">
       {planStep === 1 && (
         <StepChat
           chatMessages={chatMessages}
@@ -139,13 +148,6 @@ export function PlanWorkspace() {
           onProceed={() => void proposeStack()}
         />
       )}
-
-      {planStep === 2 &&
-        (stackProposal ? (
-          <StepQuiz proposal={stackProposal} onNext={() => setPlanStep(3)} />
-        ) : (
-          <p className="text-sm text-muted-foreground">技術スタックを準備しています…</p>
-        ))}
 
       {planStep === 3 && stackProposal && (
         <StepWiring onBack={() => setPlanStep(2)} />
