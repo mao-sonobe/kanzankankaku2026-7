@@ -41,6 +41,8 @@ interface ProjectState {
   featureMap: FeatureMapResult | null;
   /** 配線パズル(機能ごとのデータフロー)の解析結果(生成コードに紐づく) */
   featureFlows: FeatureFlowResult | null;
+  /** Supabase products テーブルの行id。未保存(ゲスト新規チャットの初回操作前など)はnull */
+  currentProductId: string | null;
   hasHydrated: boolean;
 
   setPlanStep: (step: PlanStep) => void;
@@ -68,6 +70,26 @@ interface ProjectState {
   setChunkedFile: (path: string, chunked: ChunkedFile) => void;
   setSlotAnswer: (path: string, slotId: string, choiceId: string) => void;
   resetProject: () => void;
+  setCurrentProductId: (id: string | null) => void;
+  /** 新規チャットを開始する(状態を初期化しつつ、Supabaseの行idも切り離す)。 */
+  startNewProduct: () => void;
+  /** Supabaseから読み込んだプロダクトの内容をストアに反映する。 */
+  loadProduct: (product: {
+    id: string;
+    planStep: PlanStep;
+    planText: string;
+    projectTitle: string | null;
+    hearingReady: boolean;
+    chatMessages: ChatMessage[];
+    stackProposal: TechStackProposal | null;
+    stackQuiz: StackQuizState;
+    stackQuizSkipped: boolean;
+    generatedFiles: GeneratedFile[];
+    chunkedFiles: Record<string, ChunkedFile>;
+    slotAnswers: Record<string, Record<string, string>>;
+    featureMap: FeatureMapResult | null;
+    featureFlows: FeatureFlowResult | null;
+  }) => void;
   setHasHydrated: (value: boolean) => void;
 }
 
@@ -93,6 +115,7 @@ const INITIAL_STATE = {
   slotAnswers: {},
   featureMap: null,
   featureFlows: null,
+  currentProductId: null as string | null,
 };
 
 export const useProjectStore = create<ProjectState>()(
@@ -208,6 +231,32 @@ export const useProjectStore = create<ProjectState>()(
 
       resetProject: () => set({ ...INITIAL_STATE }),
 
+      setCurrentProductId: (id) => set({ currentProductId: id }),
+
+      startNewProduct: () => set({ ...INITIAL_STATE }),
+
+      loadProduct: (product) =>
+        set({
+          currentProductId: product.id,
+          planStep: product.planStep,
+          planText: product.planText,
+          projectTitle: product.projectTitle,
+          hearingReady: product.hearingReady,
+          chatMessages: product.chatMessages,
+          stackProposal: product.stackProposal,
+          stackQuiz: product.stackQuiz,
+          stackQuizSkipped: product.stackQuizSkipped,
+          generatedFiles: product.generatedFiles,
+          chunkedFiles: product.chunkedFiles,
+          slotAnswers: product.slotAnswers,
+          featureMap: product.featureMap,
+          featureFlows: product.featureFlows,
+          // WebContainerは行をまたいで復元できないため、プレビューは再生成が必要。
+          previewUrl: null,
+          highlighted: null,
+          pinned: false,
+        }),
+
       setHasHydrated: (value) => set({ hasHydrated: value }),
     }),
     {
@@ -243,6 +292,7 @@ export const useProjectStore = create<ProjectState>()(
         slotAnswers: state.slotAnswers,
         featureMap: state.featureMap,
         featureFlows: state.featureFlows,
+        currentProductId: state.currentProductId,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);

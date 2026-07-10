@@ -3,6 +3,7 @@ import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { HeaderNav } from "@/components/layout/header-nav";
+import { AppShell } from "@/components/layout/app-shell";
 
 // 日本語(CJK)フォントはnext/font/googleのサブセット機構が対応していないため、
 // Noto Sans JP・Shippori MinchoはglobalsCSS側で@importして読み込む。
@@ -31,7 +32,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
           <HeaderNav />
-          <main className="flex flex-1 flex-col">{children}</main>
+          <main className="flex flex-1 flex-col">
+            <AppShell>{children}</AppShell>
+          </main>
         </TooltipProvider>
       </body>
     </html>
