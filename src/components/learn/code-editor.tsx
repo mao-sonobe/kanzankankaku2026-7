@@ -202,6 +202,7 @@ export function CodeEditor({
   nodeById,
   featureRanges,
   featureColorHex,
+  slotPopover,
 }: {
   chunked: ChunkedFile;
   answers: Record<string, string>;
@@ -213,9 +214,12 @@ export function CodeEditor({
   featureRanges?: FeatureRangesInChunked | null;
   /** アクティブな機能の配色(実色値)。featureRangesとセットで指定する */
   featureColorHex?: { bg: string; border: string };
+  /** アクティブな空欄の直下に浮かせて出す選択肢UI(ブロックパレット)。任意 */
+  slotPopover?: React.ReactNode;
   }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<EditorView | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
 
   const { text, ranges } = useMemo(
     () => buildFileContentWithRanges(chunked, answers),
@@ -231,6 +235,43 @@ export function CodeEditor({
   }, [featureRanges, ranges]);
 
   const connectorSegments = useFeatureConnectorLines(view, connectorPoints, containerRef);
+
+  // アクティブな空欄のすぐ下にポップオーバー(選択肢)を出すための座標を追跡する。
+  // 回答で空欄が埋まってもdata-slot-idは残るので、フィードバック表示中も追従できる。
+  useEffect(() => {
+    const slotId = activeSlotId;
+    if (!view || !slotId || !slotPopover) {
+      setPopoverPos(null);
+      return;
+    }
+    function recompute() {
+      const container = containerRef.current;
+      if (!container || !view) return;
+      const slotEl = container.querySelector(`[data-slot-id="${CSS.escape(slotId!)}"]`);
+      if (!slotEl) {
+        setPopoverPos(null);
+        return;
+      }
+      const cRect = container.getBoundingClientRect();
+      const r = slotEl.getBoundingClientRect();
+      // エディタ内スクロールで空欄が見えなくなったらポップオーバーも隠す
+      if (r.bottom < cRect.top || r.top > cRect.bottom) {
+        setPopoverPos(null);
+        return;
+      }
+      const width = 340; // ポップオーバーの幅(w-[340px])と合わせる
+      const left = Math.max(4, Math.min(r.left - cRect.left, container.clientWidth - width - 4));
+      setPopoverPos({ left, top: r.bottom - cRect.top + 6 });
+    }
+    recompute();
+    const scroller = view.scrollDOM;
+    scroller.addEventListener("scroll", recompute);
+    window.addEventListener("resize", recompute);
+    return () => {
+      scroller.removeEventListener("scroll", recompute);
+      window.removeEventListener("resize", recompute);
+    };
+  }, [view, activeSlotId, slotPopover, ranges]);
 
   const extensions = useMemo(() => {
     const decorations = buildDecorations(ranges, activeSlotId, onSlotClick, nodeById, featureRanges ?? null);
@@ -332,6 +373,16 @@ export function CodeEditor({
             />
           ))}
         </svg>
+      )}
+
+      {/* アクティブな空欄の直下に出す選択肢ポップオーバー */}
+      {slotPopover && popoverPos && (
+        <div
+          className="absolute z-30 w-[340px] rounded-xl border bg-popover p-3 shadow-lg"
+          style={{ left: popoverPos.left, top: popoverPos.top }}
+        >
+          {slotPopover}
+        </div>
       )}
     </div>
   );

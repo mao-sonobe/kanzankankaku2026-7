@@ -1,11 +1,13 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { BookOpen, Ear, FileCode2, Lightbulb, MessageCircleQuestion } from "lucide-react";
+import { BookOpen, Ear, Lightbulb, Waypoints } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProjectStore, type PlanStep } from "@/lib/store/project-store";
 
-// ①企画チャット ②カードクイズ ③パイプライン学習 ④コード生成(/build) ⑤コード理解(/learn)
+// 企画チャット→技術クイズ→配線パズル→コード理解。
+// コード生成(/build)はユーザー操作を伴わない自動処理(裏側で生成してすぐ/learnへ
+// 遷移する)なので、ナビ上のステップとしては表示しない。
 const STEPS: {
   icon: typeof BookOpen;
   label: string;
@@ -14,8 +16,7 @@ const STEPS: {
 }[] = [
   { icon: Ear, label: "企画チャット", planStep: 1 },
   { icon: BookOpen, label: "技術クイズ", planStep: 2 },
-  { icon: MessageCircleQuestion, label: "パイプライン学習", planStep: 3 },
-  { icon: FileCode2, label: "コード生成", href: "/build" },
+  { icon: Waypoints, label: "配線パズル", planStep: 3 },
   { icon: Lightbulb, label: "コード理解", href: "/learn" },
 ];
 
@@ -42,7 +43,6 @@ export function WizardSteps() {
 
   function isReachable(planStepOf?: PlanStep, href?: string): boolean {
     if (planStepOf !== undefined) return planStepOf <= maxPlanReached;
-    if (href === "/build") return !!stackProposal;
     if (href === "/learn") return hasCode;
     return false;
   }

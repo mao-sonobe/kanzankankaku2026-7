@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { HeaderNav } from "@/components/layout/header-nav";
+import { AppShell } from "@/components/layout/app-shell";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+// 日本語(CJK)フォントはnext/font/googleのサブセット機構が対応していないため、
+// Noto Sans JP・Shippori MinchoはglobalsCSS側で@importして読み込む。
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -29,14 +28,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ja"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
+    <html lang="ja" className={`${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
           <HeaderNav />
-          <main className="flex flex-1 flex-col">{children}</main>
+          <main className="flex flex-1 flex-col">
+            <AppShell>{children}</AppShell>
+          </main>
         </TooltipProvider>
       </body>
     </html>

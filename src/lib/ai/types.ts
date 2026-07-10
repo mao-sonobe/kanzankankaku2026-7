@@ -3,6 +3,7 @@
 
 import type { TechStackProposal } from "@/lib/domain/stack";
 import type { FeatureMapResult } from "@/lib/domain/feature-map";
+import type { FeatureFlowResult } from "@/lib/domain/feature-flow";
 
 export interface ChatMessage {
   role: "system" | "user" | "assistant";
@@ -100,6 +101,12 @@ export interface AnalyzeFeatureMapOptions {
   signal?: AbortSignal;
 }
 
+export interface AnalyzeFeatureFlowsOptions {
+  files: GeneratedFile[];
+  planText: string;
+  signal?: AbortSignal;
+}
+
 /**
  * AI呼び出しの抽象インターフェース。
  * OllamaAIProvider / OpenAIAIProvider を実装として持つため、
@@ -118,6 +125,11 @@ export interface AIProvider {
    * 未対応のプロバイダー(Ollama)は実装しなくてよく、UI側はその場合機能を隠す。
    */
   analyzeFeatureMap?(options: AnalyzeFeatureMapOptions): Promise<FeatureMapResult>;
+  /**
+   * 生成コードを解析し、機能ごとのデータフロー(配線パズル用)を返す。
+   * 未対応のプロバイダー(Ollama)は実装しなくてよく、UI側は機能を隠す。
+   */
+  analyzeFeatureFlows?(options: AnalyzeFeatureFlowsOptions): Promise<FeatureFlowResult>;
   /** 疎通確認。利用可能なモデル一覧を返す */
   checkConnection(): Promise<{ ok: boolean; models?: string[]; error?: string }>;
 }

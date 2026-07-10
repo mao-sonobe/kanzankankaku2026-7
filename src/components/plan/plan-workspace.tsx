@@ -5,7 +5,7 @@ import { useProjectStore } from "@/lib/store/project-store";
 import { getAIProvider } from "@/lib/ai/get-provider";
 import { StepChat } from "./step-chat";
 import { StepQuiz } from "./step-quiz";
-import { StepPipeline } from "./step-pipeline";
+import { StepWiring } from "./step-wiring";
 
 const READY_MARKER = "[READY]";
 
@@ -68,10 +68,7 @@ export function PlanWorkspace() {
     setChatError(null);
 
     const isFirst = useProjectStore.getState().chatMessages.length === 0;
-    if (isFirst) {
-      setPlanText(text);
-      void generateTitle(text);
-    }
+    if (isFirst) setPlanText(text);
     addChatMessage({ role: "user", content: text });
     const history = useProjectStore.getState().chatMessages;
 
@@ -96,6 +93,10 @@ export function PlanWorkspace() {
     } finally {
       setIsChatting(false);
     }
+
+    // 企画名は装飾なので、ヒアリング応答が終わってから直列で生成する
+    // (初回メッセージでchat呼び出しを同時に2本走らせるとレート制限に当たりやすいため)。
+    if (isFirst) void generateTitle(text);
   }
 
   async function proposeStack() {
@@ -123,8 +124,17 @@ export function PlanWorkspace() {
     }
   }
 
+  // ②カードクイズは構成図を大きく見せたいので、幅制限なしでコンテンツ領域いっぱいに使う。
+  if (planStep === 2) {
+    return stackProposal ? (
+      <StepQuiz proposal={stackProposal} onNext={() => setPlanStep(3)} />
+    ) : (
+      <p className="px-6 py-10 text-sm text-muted-foreground">技術スタックを準備しています…</p>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-5xl flex-1 space-y-6 px-6 py-10">
       {planStep === 1 && (
         <StepChat
           chatMessages={chatMessages}
@@ -139,15 +149,8 @@ export function PlanWorkspace() {
         />
       )}
 
-      {planStep === 2 &&
-        (stackProposal ? (
-          <StepQuiz proposal={stackProposal} onNext={() => setPlanStep(3)} />
-        ) : (
-          <p className="text-sm text-muted-foreground">技術スタックを準備しています…</p>
-        ))}
-
       {planStep === 3 && stackProposal && (
-        <StepPipeline proposal={stackProposal} onBack={() => setPlanStep(2)} />
+        <StepWiring onBack={() => setPlanStep(2)} />
       )}
     </div>
   );

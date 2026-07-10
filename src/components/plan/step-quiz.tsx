@@ -13,7 +13,7 @@ import type { TechStackProposal } from "@/lib/domain/stack";
 import { getAIProvider } from "@/lib/ai/get-provider";
 import { getScaffoldFiles } from "@/lib/generated-app/scaffold";
 import { useProjectStore } from "@/lib/store/project-store";
-import { QuizPipeline } from "./quiz-pipeline";
+import { TechFlowDiagram } from "./tech-flow-diagram";
 import { QuizDeck } from "./quiz-deck";
 import { QuizHistory, type QuizHistoryItem } from "./quiz-history";
 
@@ -42,10 +42,12 @@ export function StepQuiz({
     [ordered]
   );
 
-  // 回答済みノードをパイプライン順で(中央の縦チェーンに使う)
-  const revealedNodes = ordered.filter(
-    (n) => stackQuizSkipped || getQuizEntry(stackQuiz, n.id) || buildQuizChoices(n) === null
-  );
+  // 回答済み(または誤答を作れずクイズ対象外)のノードだけ構成図に出す。
+  function isRevealed(nodeId: string) {
+    if (stackQuizSkipped) return true;
+    const node = proposal.nodes.find((n) => n.id === nodeId);
+    return !!getQuizEntry(stackQuiz, nodeId) || (node ? buildQuizChoices(node) === null : false);
+  }
 
   // 履歴カードは新しい順
   const answeredItems: QuizHistoryItem[] = quizNodes
@@ -103,52 +105,59 @@ export function StepQuiz({
   }, [planText, proposal]);
 
   return (
-    <div className="relative">
+    // コンテンツ領域(サイドバーを除いた幅)いっぱいに広げ、
+    // ヘッダー分を除いた高さに収めてスクロールを無くす。
+    <div className="relative h-[calc(100vh-4rem-1px)] w-full overflow-hidden">
       {!complete && (
-        <div className="absolute right-0 top-0 z-20">
+        <div className="absolute right-4 top-2 z-30">
           <Button variant="ghost" size="sm" onClick={skipQuiz}>
             全部見る
           </Button>
         </div>
       )}
 
-      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(130px,180px)_1fr_minmax(320px,420px)]">
-        {/* 左: 回答履歴 */}
-        <div className="order-3 lg:order-1">
+      <div className="flex h-full">
+        {/* 左: 回答履歴(画面左端に密着・ゲームカード風)。ホバー展開が図の上に来るようz付与 */}
+        <div className="relative z-20 w-[120px] flex-none pt-4">
           <QuizHistory
             items={answeredItems}
+            proposal={proposal}
             hoveredNodeId={hoveredNodeId}
             onHoverNode={setHoveredNodeId}
           />
         </div>
 
-        {/* 中央: 縦チェーン構成図(枠なし) */}
-        <div className="order-2">
-          <QuizPipeline nodes={revealedNodes} highlightNodeId={hoveredNodeId} />
-        </div>
-
-        {/* 右: カードデッキ */}
-        <div className="order-1 lg:order-3">
-          {!complete && currentNode ? (
-            <QuizDeck
-              node={currentNode}
-              choices={currentChoices}
-              remaining={quizNodes.length - answeredCount}
-              onAnswer={handleAnswer}
+        {/* 主エリア: 中央に構成図を下地として置き、その真上にカードデッキを重ねる。
+            カードを答え終わると中央の構成図が現れる。 */}
+        <div className="relative flex-1 overflow-hidden">
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <TechFlowDiagram
+              proposal={proposal}
+              isRevealed={isRevealed}
+              hideUnrevealed
+              highlightNodeId={hoveredNodeId}
+              onHoverNode={setHoveredNodeId}
             />
+          </div>
+
+          {!complete && currentNode ? (
+            <div className="absolute left-1/2 top-1/2 z-10 w-[380px] max-w-[42vw] -translate-x-1/2 -translate-y-1/2">
+              <QuizDeck
+                node={currentNode}
+                choices={currentChoices}
+                remaining={quizNodes.length - answeredCount}
+                onAnswer={handleAnswer}
+              />
+            </div>
           ) : (
-            <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 rounded-3xl border border-dashed border-pink-300 bg-pink-50/60 p-6 text-center">
-              <p className="text-sm font-medium">全カード回答済み!</p>
-              <p className="text-xs text-muted-foreground">
-                次は、この技術たちの間をデータがどう流れるかを学びましょう。
-              </p>
+            <div className="absolute bottom-8 left-1/2 z-20 -translate-x-1/2">
               <Button
                 size="lg"
                 onClick={onNext}
-                className="rounded-full text-white"
-                style={{ background: "var(--brand-pink)" }}
+                className="rounded-full text-white shadow-lg"
+                style={{ background: "linear-gradient(90deg, var(--brand-blue), var(--brand-pink))" }}
               >
-                パイプライン学習へ→
+                配線パズルへ→
               </Button>
             </div>
           )}

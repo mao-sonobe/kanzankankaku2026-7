@@ -109,8 +109,8 @@ export function BuildWorkspace() {
     }
   }
 
-  // 生成されたコードの全文をここで見せてしまうと、③の穴埋め学習の前に答えを見せることになるため、
-  // コード生成〜WebContainer起動は裏側で自動的に走らせ、完了したら③のコード理解画面へ自動遷移する。
+  // 生成されたコードの全文をここで見せてしまうと、穴埋め学習の前に答えを見せることになるため、
+  // コード生成〜WebContainer起動は裏側で自動的に走らせ、完了したらコード理解画面へ自動遷移する。
   useEffect(() => {
     if (!stackProposal || startedRef.current) return;
     // クイズ中の先回し生成がまだ走っている場合は、二重生成を避けて完了(generatedFiles反映)を待つ。

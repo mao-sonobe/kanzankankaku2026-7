@@ -2,13 +2,23 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Wrench } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Library, LogOut, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WizardSteps } from "@/components/plan/wizard-steps";
+import { useAuth } from "@/lib/supabase/use-auth";
+import { createClient } from "@/lib/supabase/client";
 
 export function HeaderNav() {
   const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAuth();
+
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/login");
+  }
 
   return (
     <header className="border-b bg-background/95 backdrop-blur sticky top-0 z-50">
@@ -20,16 +30,44 @@ export function HeaderNav() {
         <div className="flex flex-1 justify-center">
           <WizardSteps />
         </div>
-        <Link
-          href="/settings"
-          aria-label="設定"
-          className={cn(
-            "flex-none rounded-full p-2 transition-colors hover:bg-muted",
-            pathname === "/settings" ? "text-foreground" : "text-muted-foreground"
+        <div className="flex flex-none items-center gap-1">
+          <Link
+            href="/tech"
+            aria-label="技術辞書"
+            className={cn(
+              "rounded-full p-2 transition-colors hover:bg-muted",
+              pathname.startsWith("/tech") ? "text-foreground" : "text-muted-foreground"
+            )}
+          >
+            <Library className="size-5" />
+          </Link>
+          <Link
+            href="/settings"
+            aria-label="設定"
+            className={cn(
+              "rounded-full p-2 transition-colors hover:bg-muted",
+              pathname === "/settings" ? "text-foreground" : "text-muted-foreground"
+            )}
+          >
+            <Wrench className="size-5" />
+          </Link>
+          {user && (
+            <div className="flex flex-none items-center gap-2">
+              <span className="hidden max-w-32 truncate text-xs text-muted-foreground sm:inline">
+                {user.is_anonymous ? "ゲスト" : user.email}
+              </span>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                aria-label="ログアウト"
+                title="ログアウト"
+                className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
           )}
-        >
-          <Wrench className="size-5" />
-        </Link>
+        </div>
       </div>
     </header>
   );

@@ -4,6 +4,7 @@ import type { ChatMessage, ChunkedFile, GeneratedFile } from "@/lib/ai/types";
 import type { TechStackProposal } from "@/lib/domain/stack";
 import { reconcileQuizState, type StackQuizEntry, type StackQuizState } from "@/lib/domain/stack-quiz";
 import type { FeatureMapResult } from "@/lib/domain/feature-map";
+import type { FeatureFlowResult } from "@/lib/domain/feature-flow";
 import { idbStorage } from "./idb-storage";
 
 export interface Highlight {
@@ -11,7 +12,7 @@ export interface Highlight {
   id: string;
 }
 
-/** ①企画チャット ②カードクイズ ③パイプライン学習 */
+/** ①企画チャット ②カードクイズ ③配線パズル */
 export type PlanStep = 1 | 2 | 3;
 
 interface ProjectState {
@@ -38,6 +39,12 @@ interface ProjectState {
   slotAnswers: Record<string, Record<string, string>>;
   /** 機能マップの解析結果(生成コードに紐づく) */
   featureMap: FeatureMapResult | null;
+  /** 配線パズル(機能ごとのデータフロー)の解析結果(生成コードに紐づく) */
+  featureFlows: FeatureFlowResult | null;
+  /** Supabase products テーブルの行id。未保存(ゲスト新規チャットの初回操作前など)はnull */
+  currentProductId: string | null;
+  /** trueの間は自動保存がtitleを上書きしない(サイドバーで手動リネームした) */
+  titleIsCustom: boolean;
   hasHydrated: boolean;
 
   setPlanStep: (step: PlanStep) => void;
@@ -53,6 +60,7 @@ interface ProjectState {
   answerQuizNode: (nodeId: string, entry: StackQuizEntry) => void;
   skipQuiz: () => void;
   setFeatureMap: (result: FeatureMapResult | null) => void;
+  setFeatureFlows: (result: FeatureFlowResult | null) => void;
   hoverHighlight: (highlight: Highlight) => void;
   clearHoverHighlight: (highlight: Highlight) => void;
   toggleClickHighlight: (highlight: Highlight) => void;
@@ -63,7 +71,28 @@ interface ProjectState {
   setPreviewUrl: (url: string | null) => void;
   setChunkedFile: (path: string, chunked: ChunkedFile) => void;
   setSlotAnswer: (path: string, slotId: string, choiceId: string) => void;
-  resetProject: () => void;
+  setCurrentProductId: (id: string | null) => void;
+  setTitleIsCustom: (value: boolean) => void;
+  /** 新規チャットを開始する(状態を初期化しつつ、Supabaseの行idも切り離す)。 */
+  startNewProduct: () => void;
+  /** Supabaseから読み込んだプロダクトの内容をストアに反映する。 */
+  loadProduct: (product: {
+    id: string;
+    planStep: PlanStep;
+    planText: string;
+    projectTitle: string | null;
+    hearingReady: boolean;
+    chatMessages: ChatMessage[];
+    stackProposal: TechStackProposal | null;
+    stackQuiz: StackQuizState;
+    stackQuizSkipped: boolean;
+    generatedFiles: GeneratedFile[];
+    chunkedFiles: Record<string, ChunkedFile>;
+    slotAnswers: Record<string, Record<string, string>>;
+    featureMap: FeatureMapResult | null;
+    featureFlows: FeatureFlowResult | null;
+    titleIsCustom: boolean;
+  }) => void;
   setHasHydrated: (value: boolean) => void;
 }
 
@@ -88,6 +117,9 @@ const INITIAL_STATE = {
   chunkedFiles: {},
   slotAnswers: {},
   featureMap: null,
+  featureFlows: null,
+  currentProductId: null as string | null,
+  titleIsCustom: false,
 };
 
 export const useProjectStore = create<ProjectState>()(
@@ -141,6 +173,8 @@ export const useProjectStore = create<ProjectState>()(
 
       setFeatureMap: (result) => set({ featureMap: result }),
 
+      setFeatureFlows: (result) => set({ featureFlows: result }),
+
       hoverHighlight: (highlight) => {
         if (!get().pinned) set({ highlighted: highlight });
       },
@@ -176,6 +210,7 @@ export const useProjectStore = create<ProjectState>()(
           slotAnswers: {},
           previewUrl: null,
           featureMap: null,
+          featureFlows: null,
         }),
 
       setIsPregenerating: (value) => set({ isPregenerating: value }),
@@ -198,7 +233,34 @@ export const useProjectStore = create<ProjectState>()(
           },
         })),
 
-      resetProject: () => set({ ...INITIAL_STATE }),
+      setCurrentProductId: (id) => set({ currentProductId: id }),
+
+      setTitleIsCustom: (value) => set({ titleIsCustom: value }),
+
+      startNewProduct: () => set({ ...INITIAL_STATE }),
+
+      loadProduct: (product) =>
+        set({
+          currentProductId: product.id,
+          titleIsCustom: product.titleIsCustom,
+          planStep: product.planStep,
+          planText: product.planText,
+          projectTitle: product.projectTitle,
+          hearingReady: product.hearingReady,
+          chatMessages: product.chatMessages,
+          stackProposal: product.stackProposal,
+          stackQuiz: product.stackQuiz,
+          stackQuizSkipped: product.stackQuizSkipped,
+          generatedFiles: product.generatedFiles,
+          chunkedFiles: product.chunkedFiles,
+          slotAnswers: product.slotAnswers,
+          featureMap: product.featureMap,
+          featureFlows: product.featureFlows,
+          // WebContainerは行をまたいで復元できないため、プレビューは再生成が必要。
+          previewUrl: null,
+          highlighted: null,
+          pinned: false,
+        }),
 
       setHasHydrated: (value) => set({ hasHydrated: value }),
     }),
@@ -234,6 +296,9 @@ export const useProjectStore = create<ProjectState>()(
         chunkedFiles: state.chunkedFiles,
         slotAnswers: state.slotAnswers,
         featureMap: state.featureMap,
+        featureFlows: state.featureFlows,
+        currentProductId: state.currentProductId,
+        titleIsCustom: state.titleIsCustom,
       }),
       onRehydrateStorage: () => (state) => {
         state?.setHasHydrated(true);
