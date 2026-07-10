@@ -158,7 +158,10 @@ export interface PositionedFlowNode {
  * 役割ごとに列を固定すると1列に偏って重なるため、順序ベースのグリッドで散らす。
  * ドラッグ配線のヒットテスト用に割合座標を返す。
  */
-export function layoutFlowNodes(feature: FeatureFlow): PositionedFlowNode[] {
+export function layoutFlowNodes(
+  feature: FeatureFlow,
+  opts?: { singleColumn?: boolean }
+): PositionedFlowNode[] {
   // ステップの出発→到達の順にノードidを並べ、残りを後ろに付ける(データが流れる順)。
   const order: string[] = [];
   const seen = new Set<string>();
@@ -178,7 +181,8 @@ export function layoutFlowNodes(feature: FeatureFlow): PositionedFlowNode[] {
   const ordered = order.map((id) => nodeById.get(id)!).filter(Boolean);
 
   const n = ordered.length;
-  const cols = n <= 3 ? n : n <= 4 ? 2 : 3;
+  // スマホ幅ではカードが横に並びきらないため、1列(縦積み)に強制する。
+  const cols = opts?.singleColumn ? 1 : n <= 3 ? n : n <= 4 ? 2 : 3;
   const rows = Math.ceil(n / cols);
 
   const result: PositionedFlowNode[] = [];
@@ -189,7 +193,10 @@ export function layoutFlowNodes(feature: FeatureFlow): PositionedFlowNode[] {
     const colsInRow = row === rows - 1 && n % cols !== 0 ? n % cols : cols;
     const xPct = colsInRow === 1 ? 0.5 : 0.18 + (0.64 * col) / (colsInRow - 1);
     // カード(コード抜粋つきで背が高い)が枠の上下で見切れないよう、縦は内側に寄せる。
-    const yPct = rows === 1 ? 0.5 : 0.24 + (0.52 * row) / (rows - 1);
+    // 1列(スマホ)は行数が増えやすいので、縦の使用幅を広めに取る。
+    const vSpread = opts?.singleColumn ? 0.86 : 0.52;
+    const vStart = (1 - vSpread) / 2;
+    const yPct = rows === 1 ? 0.5 : vStart + (vSpread * row) / (rows - 1);
     result.push({ node, xPct, yPct });
   });
   return result;

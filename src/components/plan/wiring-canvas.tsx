@@ -53,10 +53,15 @@ export function WiringCanvas({
   /** 次に配線すべきステップindex(未完了の先頭)。完了時は-1 */
   activeStepIndex: number;
 }) {
-  const positioned = layoutFlowNodes(feature);
   const containerRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const [size, setSize] = useState({ w: 0, h: 0 });
+  // 幅だけを見る(高さはこのコンポーネントでは未使用)。
+  // 高さはcompact時にノード数に応じて自分で広げるため、高さの変化まで監視すると
+  // 「監視対象の高さを自分で変える→再度検知→また変える」の無限ループになる。
+  const [width, setWidth] = useState(0);
+  // スマホ幅(コンテナが狭い)では横に並べると見切れるため、1列の縦積みに切り替える。
+  const compact = width > 0 && width < 480;
+  const positioned = layoutFlowNodes(feature, { singleColumn: compact });
   // ドラッグ中の線の始点ノードidと現在のポインタ座標(px, コンテナ相対)
   const [dragFrom, setDragFrom] = useState<string | null>(null);
   const [pointer, setPointer] = useState<Point | null>(null);
@@ -65,7 +70,7 @@ export function WiringCanvas({
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const update = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    const update = () => setWidth((prev) => (prev === el.clientWidth ? prev : el.clientWidth));
     update();
     const ro = new ResizeObserver(update);
     ro.observe(el);
@@ -127,14 +132,21 @@ export function WiringCanvas({
   const dragCenter = dragFrom ? nodeCenter(dragFrom) : null;
 
   return (
-    // 配線エリア。高さは画面に合わせて伸ばし、1画面に大きく収める。
+    // 配線エリア。高さは画面に合わせて伸ばし、1画面に大きく収める(スマホは縦積みで行数が増えるぶん低めに)。
     <div
-      className="flex h-[calc(100vh-21rem)] min-h-[680px] w-full flex-col overflow-hidden rounded-2xl border-2 bg-pink-50/40"
+      className={cn(
+        "flex h-[calc(100vh-14rem)] min-h-[420px] w-full flex-col rounded-2xl border-2 bg-pink-50/40 sm:h-[calc(100vh-21rem)] sm:min-h-[680px]",
+        // スマホ(1列縦積み)は中身がこの枠の高さを超えやすいため、隠さずスクロールで見せる。
+        compact ? "overflow-y-auto" : "overflow-hidden"
+      )}
       style={{ borderColor: "var(--brand-pink)" }}
     >
       <div
         ref={containerRef}
         className="relative min-h-0 flex-1 touch-none select-none"
+        // 1列縦積み(スマホ)は行数が増えるほど必要な高さも増えるため、
+        // カードが重ならないよう最低限の高さを確保し、外側のスクロールで見られるようにする。
+        style={compact ? { minHeight: positioned.length * 190 } : undefined}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
       >
@@ -179,7 +191,7 @@ export function WiringCanvas({
       </svg>
 
       {/* ノード */}
-      {size.w > 0 &&
+      {width > 0 &&
         positioned.map(({ node, xPct, yPct }) => {
           const step = activeStepIndex >= 0 ? feature.steps[activeStepIndex] : null;
           const isNextSource = step?.fromId === node.id && !dragFrom;
@@ -192,7 +204,8 @@ export function WiringCanvas({
               }}
               onPointerDown={(e) => handlePointerDown(e, node.id)}
               className={cn(
-                "absolute w-72 -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-xl border-2 border-pink-300 bg-pink-100 p-3 shadow-sm transition-all active:cursor-grabbing",
+                "absolute w-[min(78vw,18rem)] -translate-x-1/2 -translate-y-1/2 cursor-grab rounded-xl border-2 border-pink-300 bg-pink-100 shadow-sm transition-all active:cursor-grabbing",
+                compact ? "p-2" : "p-3",
                 isNextSource && "ring-2 ring-offset-1",
                 isHintTarget && "scale-105 ring-2",
                 wrongFlash && dragFrom === node.id && "animate-pulse"
@@ -205,20 +218,30 @@ export function WiringCanvas({
                   : {}),
               }}
             >
-              <p className="flex items-center gap-2 text-base font-bold">
-                <TechIcon name={iconNameFor(node.label, node.role)} size={18} />
+              <p className={cn("flex items-center gap-2 font-bold", compact ? "text-sm" : "text-base")}>
+                <TechIcon name={iconNameFor(node.label, node.role)} size={compact ? 14 : 18} />
                 <span className="truncate">{node.label}</span>
               </p>
               <p className="mt-0.5 text-xs text-slate-500">
                 {ROLE_LABEL[node.role] ?? node.role}
                 {node.file ? ` ・ ${node.file.split("/").pop()}` : ""}
               </p>
-              <p className="mt-1 line-clamp-2 text-sm leading-snug text-slate-600">{node.data}</p>
+              <p
+                className={cn(
+                  "mt-1 line-clamp-2 leading-snug text-slate-600",
+                  compact ? "text-xs" : "text-sm"
+                )}
+              >
+                {node.data}
+              </p>
               {/* このノードの実コード抜粋。コード部分はドラッグを始めずにスクロールできるようにする */}
               {node.snippet && (
                 <pre
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="mt-2 max-h-24 cursor-auto overflow-auto rounded-md bg-slate-900 p-2 text-xs leading-snug text-slate-100"
+                  className={cn(
+                    "cursor-auto overflow-auto rounded-md bg-slate-900 p-2 text-xs leading-snug text-slate-100",
+                    compact ? "mt-1.5 max-h-14" : "mt-2 max-h-24"
+                  )}
                 >
                   {node.snippet}
                 </pre>

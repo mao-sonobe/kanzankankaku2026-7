@@ -1,11 +1,24 @@
 "use client";
 
-import { type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { Check, X } from "lucide-react";
 import { TechIcon } from "@/components/ui/tech-icon";
 import { normalizeWrongAnswers, type StackQuizEntry } from "@/lib/domain/stack-quiz";
 import type { TechStackNode, TechStackProposal } from "@/lib/domain/stack";
 import { cn } from "@/lib/utils";
+
+/** スマホ幅かどうか。狭い画面ではホバー展開が入りきらないため、下シート表示に切り替える。 */
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 640);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isMobile;
+}
 
 export interface QuizHistoryItem {
   node: TechStackNode;
@@ -83,6 +96,7 @@ export function QuizHistory({
   hoveredNodeId: string | null;
   onHoverNode: (nodeId: string | null) => void;
 }) {
+  const isMobile = useIsMobile();
   const nodeById = new Map(proposal.nodes.map((n) => [n.id, n]));
 
   function flowsFor(nodeId: string): FlowInfo[] {
@@ -112,47 +126,38 @@ export function QuizHistory({
     if (it) onHoverNode(it.node.id);
   }
 
+  // スマホはホバーが効かないため、タップでも開閉できるようにする(同じカードを再タップで閉じる)。
+  function toggleFromTap(e: ReactMouseEvent) {
+    const el = (e.target as HTMLElement).closest("[data-hist-idx]");
+    if (!el) return;
+    const idx = Number(el.getAttribute("data-hist-idx"));
+    const it = items[idx];
+    if (!it) return;
+    onHoverNode(hoveredNodeId === it.node.id ? null : it.node.id);
+  }
+
   return (
     <div
       className="flex flex-col gap-2"
-      onMouseOver={activateFromEvent}
-      onMouseLeave={() => onHoverNode(null)}
+      // モバイルは実機によってはタップ時に疑似的なmouseoverが飛ぶことがあり、
+      // クリックの開閉と競合して開いた瞬間閉じてしまうため、ホバー系はデスクトップのみ有効にする。
+      onMouseOver={isMobile ? undefined : activateFromEvent}
+      onMouseLeave={isMobile ? undefined : () => onHoverNode(null)}
+      onClick={isMobile ? toggleFromTap : undefined}
     >
       {items.map(({ node, entry }, i) => {
         const isWrong = entry.status === "wrong" && !!entry.chosen;
-        const chosenReason = isWrong
-          ? normalizeWrongAnswers(node).find((w) => w.label === entry.chosen)?.reason
-          : undefined;
-        const hovered = hoveredNodeId === node.id;
+        // スマホは入りきらないインライン展開をやめ、下シートに出す(下でportal表示)。
+        const hovered = !isMobile && hoveredNodeId === node.id;
         const displayTech = isWrong ? entry.chosen! : node.label;
-        const flows = flowsFor(node.id);
         const hasNext = i < items.length - 1;
         return (
           <div key={node.id} className={cn("relative", hovered && "z-40")}>
             {hovered ? (
               /* ホバー時: その場で大きく展開。縦に伸びるので下のカードは押し下げられてズレる
-                 (覆い隠さない)。幅は右方向へ図の上にせり出す。 */
-              <div
-                data-hist-idx={i}
-                className={cn("relative flex gap-2", isWrong ? "w-[440px]" : "w-[240px]")}
-              >
-                {isWrong ? (
-                  <>
-                    <DetailCard
-                      tech={node.label}
-                      correct
-                      text={`${node.description} そのため今回はこちらが正解。`}
-                      flows={flows}
-                    />
-                    <DetailCard
-                      tech={entry.chosen!}
-                      correct={false}
-                      text={chosenReason ?? "今回の企画では上の理由から不向きです。"}
-                    />
-                  </>
-                ) : (
-                  <DetailCard tech={node.label} correct text={node.description} flows={flows} />
-                )}
+                 (覆い隠さない)。幅は右方向へ図の上にせり出す。(デスクトップのみ) */
+              <div data-hist-idx={i} className={cn("relative flex gap-2", isWrong ? "w-[440px]" : "w-[240px]")}>
+                {renderDetail(node, entry, isWrong)}
                 {/* 下辺のハンドオフ帯: ここにカーソルが来たら次のカードが大きくなる
                    (大きいカードの下に真っ直ぐ降りても次を開けるように、カード幅いっぱい) */}
                 {hasNext && (
@@ -174,6 +179,64 @@ export function QuizHistory({
           </div>
         );
       })}
+
+      {/* スマホ用: 選択中カードの詳細を画面下部のシートとして表示する(overflow-hiddenに切り取られないようportal)。 */}
+      {isMobile &&
+        hoveredNodeId &&
+        (() => {
+          const hit = items.find(({ node }) => node.id === hoveredNodeId);
+          if (!hit) return null;
+          const { node, entry } = hit;
+          const isWrong = entry.status === "wrong" && !!entry.chosen;
+          return createPortal(
+            <div className="fixed inset-0 z-50 flex flex-col justify-end" onClick={() => onHoverNode(null)}>
+              <div className="flex-1" />
+              <div
+                onClick={(e) => e.stopPropagation()}
+                className="max-h-[70vh] space-y-2 overflow-y-auto rounded-t-2xl border-t border-pink-200 bg-white p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-2xl"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold text-muted-foreground">技術の詳細</p>
+                  <button
+                    type="button"
+                    aria-label="閉じる"
+                    onClick={() => onHoverNode(null)}
+                    className="rounded p-1 text-muted-foreground hover:bg-muted"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+                <div className={cn("flex gap-2", isWrong && "flex-col")}>
+                  {renderDetail(node, entry, isWrong)}
+                </div>
+              </div>
+            </div>,
+            document.body
+          );
+        })()}
     </div>
   );
+
+  function renderDetail(node: TechStackNode, entry: StackQuizEntry, isWrong: boolean) {
+    const flows = flowsFor(node.id);
+    if (!isWrong) {
+      return <DetailCard tech={node.label} correct text={node.description} flows={flows} />;
+    }
+    const chosenReason = normalizeWrongAnswers(node).find((w) => w.label === entry.chosen)?.reason;
+    return (
+      <>
+        <DetailCard
+          tech={node.label}
+          correct
+          text={`${node.description} そのため今回はこちらが正解。`}
+          flows={flows}
+        />
+        <DetailCard
+          tech={entry.chosen!}
+          correct={false}
+          text={chosenReason ?? "今回の企画では上の理由から不向きです。"}
+        />
+      </>
+    );
+  }
 }

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -22,6 +22,12 @@ export const metadata: Metadata = {
   },
 };
 
+// スマホ下部固定バーがiPhoneのホームインジケーター領域と重ならないよう、
+// env(safe-area-inset-bottom)を有効にする。
+export const viewport: Viewport = {
+  viewportFit: "cover",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -32,7 +38,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <TooltipProvider>
           <HeaderNav />
-          <main className="flex flex-1 flex-col">
+          <main className="flex flex-1 flex-col pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0">
             <AppShell>{children}</AppShell>
           </main>
         </TooltipProvider>

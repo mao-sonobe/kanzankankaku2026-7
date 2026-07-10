@@ -141,7 +141,7 @@ export function StepQuiz({
           </div>
 
           {!complete && currentNode ? (
-            <div className="absolute left-1/2 top-1/2 z-10 w-[380px] max-w-[42vw] -translate-x-1/2 -translate-y-1/2">
+            <div className="absolute left-1/2 top-1/2 z-10 w-[380px] max-w-[88vw] -translate-x-1/2 -translate-y-1/2 sm:max-w-[42vw]">
               <QuizDeck
                 node={currentNode}
                 choices={currentChoices}
