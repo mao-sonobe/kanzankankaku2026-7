@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { EditorView, Decoration, WidgetType, type DecorationSet } from "@codemirror/view";
@@ -219,7 +220,11 @@ export function CodeEditor({
   }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<EditorView | null>(null);
-  const [popoverPos, setPopoverPos] = useState<{ left: number; top: number } | null>(null);
+  const [popoverPos, setPopoverPos] = useState<{
+    left: number;
+    top: number;
+    maxHeight: number;
+  } | null>(null);
 
   const { text, ranges } = useMemo(
     () => buildFileContentWithRanges(chunked, answers),
@@ -259,17 +264,27 @@ export function CodeEditor({
         setPopoverPos(null);
         return;
       }
+      // 画面(viewport)基準の座標で置く: Cardのoverflow-hiddenに切り取られないようにするため、
+      // ポップオーバーはportalでbody直下に描画し、container相対ではなくfixed配置にする。
       const width = 340; // ポップオーバーの幅(w-[340px])と合わせる
-      const left = Math.max(4, Math.min(r.left - cRect.left, container.clientWidth - width - 4));
-      setPopoverPos({ left, top: r.bottom - cRect.top + 6 });
+      const margin = 8;
+      const left = Math.max(margin, Math.min(r.left, window.innerWidth - width - margin));
+      const top = r.bottom + 6;
+      // 画面下端をはみ出す分は、ポップオーバー自身をスクロール可能にして吸収する
+      // (切り取られて選べなくなることがないようにするため)。
+      const maxHeight = Math.max(120, window.innerHeight - top - margin);
+      setPopoverPos({ left, top, maxHeight });
     }
     recompute();
     const scroller = view.scrollDOM;
     scroller.addEventListener("scroll", recompute);
     window.addEventListener("resize", recompute);
+    // ページ自体がスクロールされた場合(エディタ内スクロールとは別)にも追従させる。
+    document.addEventListener("scroll", recompute, true);
     return () => {
       scroller.removeEventListener("scroll", recompute);
       window.removeEventListener("resize", recompute);
+      document.removeEventListener("scroll", recompute, true);
     };
   }, [view, activeSlotId, slotPopover, ranges]);
 
@@ -375,15 +390,19 @@ export function CodeEditor({
         </svg>
       )}
 
-      {/* アクティブな空欄の直下に出す選択肢ポップオーバー */}
-      {slotPopover && popoverPos && (
-        <div
-          className="absolute z-30 w-[340px] rounded-xl border bg-popover p-3 shadow-lg"
-          style={{ left: popoverPos.left, top: popoverPos.top }}
-        >
-          {slotPopover}
-        </div>
-      )}
+      {/* アクティブな空欄の直下に出す選択肢ポップオーバー。
+          カード側のoverflow-hiddenに切り取られないよう、body直下にportalしてfixed配置する。 */}
+      {slotPopover &&
+        popoverPos &&
+        createPortal(
+          <div
+            className="fixed z-50 w-[340px] overflow-y-auto rounded-xl border bg-popover p-3 shadow-lg"
+            style={{ left: popoverPos.left, top: popoverPos.top, maxHeight: popoverPos.maxHeight }}
+          >
+            {slotPopover}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
