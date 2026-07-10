@@ -107,7 +107,8 @@ export function StepQuiz({
   return (
     // コンテンツ領域(サイドバーを除いた幅)いっぱいに広げ、
     // ヘッダー分を除いた高さに収めてスクロールを無くす。
-    <div className="relative h-[calc(100vh-4rem-1px)] w-full overflow-hidden">
+    // スマホは下部固定バーの分も差し引く(mainのpadding-bottomと同じ量)。
+    <div className="relative h-[calc(100vh-4rem-1px-3.5rem-env(safe-area-inset-bottom))] w-full overflow-hidden md:h-[calc(100vh-4rem-1px)]">
       {!complete && (
         <div className="absolute right-4 top-2 z-30">
           <Button variant="ghost" size="sm" onClick={skipQuiz}>
@@ -117,8 +118,10 @@ export function StepQuiz({
       )}
 
       <div className="flex h-full">
-        {/* 左: 回答履歴(画面左端に密着・ゲームカード風)。ホバー展開が図の上に来るようz付与 */}
-        <div className="relative z-20 w-[120px] flex-none pt-4">
+        {/* 左: 回答履歴(画面左端に密着・ゲームカード風)。ホバー展開が図の上に来るようz付与。
+            スマホは横幅に余裕がないため、主エリアの幅を圧迫しないよう
+            flexの外(絶対配置の重ね表示)にする。PCは従来通りflexの1カラムとして幅を確保する。 */}
+        <div className="absolute left-0 top-2 z-20 w-[90px] md:relative md:top-auto md:w-[120px] md:flex-none md:pt-4">
           <QuizHistory
             items={answeredItems}
             proposal={proposal}
@@ -141,7 +144,9 @@ export function StepQuiz({
           </div>
 
           {!complete && currentNode ? (
-            <div className="absolute left-1/2 top-1/2 z-10 w-[380px] max-w-[88vw] -translate-x-1/2 -translate-y-1/2 sm:max-w-[42vw]">
+            <div className="absolute left-1/2 top-1/2 z-10 w-[92%] max-w-[380px] -translate-x-1/2 -translate-y-1/2">
+              {/* 幅は%指定(このdivの親要素=左のQuizHistory列を除いた実際の幅)基準。
+                  vw基準だとスマホでは左の履歴列の分だけ画面より広くなり左右が切れていた。 */}
               <QuizDeck
                 node={currentNode}
                 choices={currentChoices}

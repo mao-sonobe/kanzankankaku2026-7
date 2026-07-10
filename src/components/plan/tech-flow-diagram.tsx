@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   DIAGRAM_NODE_H,
   DIAGRAM_NODE_W,
@@ -36,6 +36,22 @@ export function TechFlowDiagram({
   onHoverNode?: (nodeId: string | null) => void;
 }) {
   const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const [wrapWidth, setWrapWidth] = useState(0);
+
+  // 図が置かれる領域の幅を見て、入りきらないぶんだけ縮小する(スマホで横に切れないようにするため)。
+  // 幅に余裕があるPC等では1倍のまま(拡大はしない)。
+  useLayoutEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    // 高さは監視しない(この要素自身の高さを縮小率に応じて後で変えるため、
+    // 高さまで見ると「変える→検知→また変える」の無限ループになる)。
+    const update = () => setWrapWidth((prev) => (prev === el.clientWidth ? prev : el.clientWidth));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const layout = useMemo(() => {
     if (hideUnrevealed && isRevealed) {
@@ -67,9 +83,23 @@ export function TechFlowDiagram({
     );
   }
 
+  // 幅が収まらない場合だけ縮小率を計算する(余裕があるときは1倍のまま・拡大はしない)。
+  const scale = wrapWidth > 0 ? Math.min(1, wrapWidth / layout.width) : 1;
+
   return (
-    <div className="overflow-x-auto">
-      <div className="relative" style={{ width: layout.width, height: layout.height }}>
+    // 幅の計測はこのdivで行う(高さは変えないので、監視対象自身の高さを変えて
+    // 検知がループする心配がない)。実際の高さ調整は内側のdivだけで行う。
+    <div ref={wrapRef} className="w-full">
+      <div className="mx-auto" style={{ width: layout.width * scale, height: layout.height * scale }}>
+        <div
+          className="relative"
+          style={{
+            width: layout.width,
+            height: layout.height,
+            transform: scale < 1 ? `scale(${scale})` : undefined,
+            transformOrigin: "top left",
+          }}
+        >
         <svg
           viewBox={`0 0 ${layout.width} ${layout.height}`}
           width={layout.width}
@@ -180,6 +210,7 @@ export function TechFlowDiagram({
             </div>
           ) : null
         )}
+      </div>
       </div>
     </div>
   );

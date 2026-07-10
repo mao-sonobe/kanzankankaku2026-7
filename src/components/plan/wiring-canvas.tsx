@@ -143,7 +143,13 @@ export function WiringCanvas({
     >
       <div
         ref={containerRef}
-        className="relative min-h-0 flex-1 touch-none select-none"
+        className={cn(
+          "relative min-h-0 flex-1 select-none",
+          // スマホ(compact)はピンチズームで縮小して全体を見られるようにする
+          // (1本指のドラッグ配線は引き続き使えるようpinch-zoomのみ許可し、パンは許可しない)。
+          // PC版は元通りtouch-noneのまま(ズーム操作自体が存在しないので影響なし)。
+          compact ? "touch-pinch-zoom" : "touch-none"
+        )}
         // 1列縦積み(スマホ)は行数が増えるほど必要な高さも増えるため、
         // カードが重ならないよう最低限の高さを確保し、外側のスクロールで見られるようにする。
         style={compact ? { minHeight: positioned.length * 190 } : undefined}
