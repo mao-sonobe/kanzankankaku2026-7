@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { History, LogIn, LogOut, Wrench } from "lucide-react";
+import { History, LogIn, LogOut, Map, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WizardSteps } from "@/components/plan/wizard-steps";
 import { useAuthStore } from "@/lib/store/auth-store";
@@ -41,6 +41,9 @@ export function HeaderNav() {
           <WizardSteps />
         </div>
         <div className="flex flex-none items-center gap-1">
+          <Link href="/map" aria-label="習得マップ" className={iconLinkClass(pathname === "/map")}>
+            <Map className="size-5" />
+          </Link>
           {user && (
             <Link href="/history" aria-label="履歴" className={iconLinkClass(pathname === "/history")}>
               <History className="size-5" />
